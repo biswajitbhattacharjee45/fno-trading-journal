@@ -505,6 +505,107 @@
   .imp-pan-toggle:hover { opacity: 1; }
   .imp-pan-hint { font-size: 11px; color: var(--text3); margin-top: 6px; }
 
+  /* Method selector cards */
+  .imp-method-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;
+  }
+  @media (max-width: 700px) { .imp-method-grid { grid-template-columns: 1fr; } }
+  .imp-method-card {
+    position: relative; border-radius: 14px; padding: 20px;
+    border: 2px solid var(--border); background: var(--surface);
+    cursor: pointer; transition: all 0.25s; overflow: hidden;
+  }
+  .imp-method-card::before {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(135deg, rgba(0,212,170,0.04), transparent);
+    opacity: 0; transition: opacity 0.3s;
+  }
+  .imp-method-card:hover { border-color: rgba(0,212,170,0.3); transform: translateY(-2px); }
+  .imp-method-card:hover::before { opacity: 1; }
+  .imp-method-card.active {
+    border-color: var(--accent);
+    background: rgba(0,212,170,0.04);
+    box-shadow: 0 0 24px rgba(0,212,170,0.1);
+  }
+  .imp-method-card.active::before { opacity: 1; }
+  .imp-method-badge {
+    display: inline-block; padding: 3px 10px; border-radius: 20px;
+    font-size: 10px; font-weight: 800; letter-spacing: 1.5px;
+    text-transform: uppercase; margin-bottom: 12px;
+  }
+  .imp-method-badge.free { background: rgba(0,212,170,0.15); color: var(--green); border: 1px solid rgba(0,212,170,0.3); }
+  .imp-method-badge.ai   { background: rgba(0,149,255,0.15); color: var(--accent2); border: 1px solid rgba(0,149,255,0.3); }
+  .imp-method-icon { font-size: 28px; margin-bottom: 10px; }
+  .imp-method-name { font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+  .imp-method-desc { font-size: 12px; color: var(--text2); line-height: 1.6; margin-bottom: 12px; }
+  .imp-method-pros { display: flex; flex-direction: column; gap: 4px; }
+  .imp-pro { font-size: 11px; color: var(--text2); }
+  .imp-method-card.active .imp-pro { color: var(--text); }
+  .imp-con { color: var(--warn) !important; }
+
+  /* Fallback banner */
+  .imp-fallback-banner {
+    display: flex; gap: 14px; align-items: flex-start;
+    background: rgba(0,212,170,0.05); border: 1px solid rgba(0,212,170,0.2);
+    border-radius: 12px; padding: 16px 18px; margin-top: 20px;
+  }
+  .imp-fb-icon { font-size: 22px; flex-shrink: 0; }
+  .imp-fb-title { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+  .imp-fb-body { font-size: 12px; color: var(--text2); line-height: 1.7; }
+  kbd {
+    display: inline-block; padding: 1px 7px; border-radius: 5px;
+    background: var(--border2); border: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--accent);
+  }
+
+  /* Paste zone */
+  .imp-paste-zone {
+    background: var(--surface); border: 2px solid var(--border2);
+    border-radius: 14px; overflow: hidden; margin-top: 16px;
+    transition: border-color 0.2s, box-shadow 0.2s; cursor: text;
+  }
+  .imp-paste-zone:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(0,212,170,0.08);
+  }
+  .imp-paste-zone-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 16px 0; 
+  }
+  .imp-paste-zone-title { font-size: 12px; font-weight: 700; color: var(--text2); letter-spacing: 0.5px; }
+  .imp-paste-zone-hint { font-size: 11px; color: var(--text3); }
+  .imp-paste-zone textarea {
+    width: 100%; min-height: 200px; background: none; border: none;
+    outline: none; resize: vertical; color: var(--text);
+    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    padding: 12px 16px; line-height: 1.8;
+  }
+  .imp-paste-actions {
+    display: flex; justify-content: flex-end;
+    padding: 8px 16px 12px; border-top: 1px solid var(--border);
+  }
+  .imp-paste-clear-btn {
+    background: none; border: 1px solid var(--border); border-radius: 6px;
+    color: var(--text3); font-size: 11px; padding: 4px 12px; cursor: pointer;
+    transition: all 0.2s; font-family: 'Sora', sans-serif;
+  }
+  .imp-paste-clear-btn:hover { color: var(--red); border-color: rgba(255,77,109,0.3); }
+
+  /* Fallback hint below PDF upload */
+  .imp-fallback-hint {
+    display: flex; align-items: center; justify-content: space-between;
+    background: rgba(255,179,71,0.06); border: 1px solid rgba(255,179,71,0.2);
+    border-radius: 10px; padding: 12px 16px; margin-top: 14px; gap: 10px; flex-wrap: wrap;
+  }
+  .imp-fallback-hint span { font-size: 13px; color: var(--warn); }
+  .imp-fallback-hint button {
+    background: rgba(255,179,71,0.1); border: 1px solid rgba(255,179,71,0.3);
+    border-radius: 8px; color: var(--warn); font-family: 'Sora', sans-serif;
+    font-size: 12px; font-weight: 600; padding: 7px 14px; cursor: pointer;
+    transition: all 0.2s;
+  }
+  .imp-fallback-hint button:hover { background: rgba(255,179,71,0.2); }
+
   /* Drop zone */
   .imp-dropzone {
     position: relative; border-radius: 14px;
@@ -800,99 +901,232 @@
     </div>
   </div>
 
-  <!-- ── STEP 1: Upload Zone ── -->
+  <!-- ── STEP 1: Method Selector + Inputs ── -->
   <div class="imp-panel" id="imp-panel-1">
     <div class="imp-panel-header">
       <span class="imp-panel-num">01</span>
       <div>
-        <div class="imp-panel-title">Upload Contract Note PDF</div>
-        <div class="imp-panel-sub">Download from your Zerodha Gmail · Open with PAN · Upload here</div>
+        <div class="imp-panel-title">Choose Import Method</div>
+        <div class="imp-panel-sub">Two ways to import — pick what works best for you today</div>
       </div>
     </div>
 
-    <!-- How-to steps -->
-    <div class="imp-howto-grid">
-      <div class="imp-howto-card">
-        <div class="imp-howto-icon">📧</div>
-        <div class="imp-howto-step">Step A</div>
-        <div class="imp-howto-text">Open your Zerodha contract note email in Gmail</div>
-      </div>
-      <div class="imp-howto-card">
-        <div class="imp-howto-icon">⬇️</div>
-        <div class="imp-howto-step">Step B</div>
-        <div class="imp-howto-text">Download the PDF attachment to your computer</div>
-      </div>
-      <div class="imp-howto-card">
-        <div class="imp-howto-icon">🔑</div>
-        <div class="imp-howto-step">Step C</div>
-        <div class="imp-howto-text">Open PDF and enter your PAN as password to unlock</div>
-      </div>
-      <div class="imp-howto-card">
-        <div class="imp-howto-icon">📤</div>
-        <div class="imp-howto-step">Step D</div>
-        <div class="imp-howto-text">Come back here and upload the unlocked PDF below</div>
-      </div>
-    </div>
+    <!-- Method selector cards — 3 methods -->
+    <div class="imp-method-grid">
 
-    <!-- PAN input -->
-    <div class="imp-pan-row">
-      <div class="imp-pan-field">
-        <label class="imp-label">Your PAN (PDF Password)</label>
-        <div class="imp-pan-input-wrap">
-          <span class="imp-pan-icon">🔐</span>
-          <input type="password" id="imp-pan" placeholder="e.g. ABCDE1234F"
-            class="imp-pan-input" maxlength="10" autocomplete="off"
-            oninput="this.value=this.value.toUpperCase()">
-          <button class="imp-pan-toggle" onclick="togglePan()" id="pan-toggle-btn" title="Show/hide PAN">👁</button>
+      <!-- Method 1: PDF Upload (AI) — PRIMARY -->
+      <div class="imp-method-card active" id="method-card-pdf" onclick="selectMethod('pdf')">
+        <div class="imp-method-badge ai">RECOMMENDED</div>
+        <div class="imp-method-icon">🤖</div>
+        <div class="imp-method-name">Upload PDF</div>
+        <div class="imp-method-desc">Ctrl+P → Save as PDF in Edge → Upload here. AI extracts all trades automatically.</div>
+        <div class="imp-method-pros">
+          <span class="imp-pro">✓ Most automatic</span>
+          <span class="imp-pro">✓ One click after save</span>
+          <span class="imp-pro imp-con">⚡ Needs API credits</span>
         </div>
-        <div class="imp-pan-hint">Never stored · Used only to decrypt the PDF locally</div>
       </div>
+
+      <!-- Method 2: Copy Paste text — FALLBACK -->
+      <div class="imp-method-card" id="method-card-paste" onclick="selectMethod('paste')">
+        <div class="imp-method-badge free">FREE FALLBACK</div>
+        <div class="imp-method-icon">📋</div>
+        <div class="imp-method-name">Copy &amp; Paste Text</div>
+        <div class="imp-method-desc">PDF upload not working? Open PDF → Ctrl+A → Ctrl+C → Paste here. Zero cost, always works.</div>
+        <div class="imp-method-pros">
+          <span class="imp-pro">✓ 100% free</span>
+          <span class="imp-pro">✓ No API needed</span>
+          <span class="imp-pro">✓ Works even if PDF save fails</span>
+        </div>
+      </div>
+
+      <!-- Method 3: Zerodha Console CSV -->
+      <div class="imp-method-card" id="method-card-csv" onclick="selectMethod('csv')">
+        <div class="imp-method-badge free">FREE</div>
+        <div class="imp-method-icon">📊</div>
+        <div class="imp-method-name">Paste from Console</div>
+        <div class="imp-method-desc">Go to Zerodha Console → Reports → Tradebook → select date → copy the table and paste here.</div>
+        <div class="imp-method-pros">
+          <span class="imp-pro">✓ No PDF needed at all</span>
+          <span class="imp-pro">✓ Clean structured data</span>
+          <span class="imp-pro">✓ Best accuracy</span>
+        </div>
+      </div>
+
     </div>
 
-    <!-- Drop zone -->
-    <div class="imp-dropzone" id="imp-dropzone"
-         ondragover="dzDragOver(event)" ondragleave="dzDragLeave()"
-         ondrop="dzDrop(event)" onclick="document.getElementById('imp-file').click()">
-      <input type="file" id="imp-file" accept=".pdf" style="display:none" onchange="dzFileChosen(event)">
-      <div class="imp-dz-inner" id="imp-dz-inner">
-        <div class="imp-dz-orbit">
-          <div class="imp-dz-orbit-ring"></div>
-          <div class="imp-dz-orbit-dot"></div>
-          <div class="imp-dz-pdf-icon">
-            <svg width="40" height="48" viewBox="0 0 40 48" fill="none">
-              <rect width="40" height="48" rx="6" fill="rgba(0,212,170,0.08)" stroke="rgba(0,212,170,0.3)" stroke-width="1.5"/>
-              <path d="M10 16h20M10 22h20M10 28h12" stroke="rgba(0,212,170,0.5)" stroke-width="1.5" stroke-linecap="round"/>
-              <text x="20" y="43" text-anchor="middle" font-size="8" fill="rgba(0,212,170,0.7)" font-family="monospace" font-weight="bold">PDF</text>
-            </svg>
+    <!-- ══ METHOD 1: PDF UPLOAD ══ -->
+    <div id="imp-mode-pdf">
+      <div class="imp-howto-grid" style="margin-top:20px">
+        <div class="imp-howto-card">
+          <div class="imp-howto-icon">📧</div>
+          <div class="imp-howto-step">Step A</div>
+          <div class="imp-howto-text">Open Zerodha contract note email &amp; download PDF</div>
+        </div>
+        <div class="imp-howto-card">
+          <div class="imp-howto-icon">🔑</div>
+          <div class="imp-howto-step">Step B</div>
+          <div class="imp-howto-text">Open in Edge → enter PAN as password</div>
+        </div>
+        <div class="imp-howto-card">
+          <div class="imp-howto-icon">🖨️</div>
+          <div class="imp-howto-step">Step C</div>
+          <div class="imp-howto-text">Ctrl+P → Save as PDF → saves an unlocked copy</div>
+        </div>
+        <div class="imp-howto-card">
+          <div class="imp-howto-icon">📤</div>
+          <div class="imp-howto-step">Step D</div>
+          <div class="imp-howto-text">Upload that saved PDF below — AI reads all trades</div>
+        </div>
+      </div>
+
+      <!-- Drop zone -->
+      <div class="imp-dropzone" id="imp-dropzone" style="margin-top:20px"
+           ondragover="dzDragOver(event)" ondragleave="dzDragLeave()"
+           ondrop="dzDrop(event)" onclick="document.getElementById('imp-file').click()">
+        <input type="file" id="imp-file" accept=".pdf" style="display:none" onchange="dzFileChosen(event)">
+        <div class="imp-dz-inner">
+          <div class="imp-dz-orbit">
+            <div class="imp-dz-orbit-ring"></div>
+            <div class="imp-dz-orbit-dot"></div>
+            <div class="imp-dz-pdf-icon">
+              <svg width="40" height="48" viewBox="0 0 40 48" fill="none">
+                <rect width="40" height="48" rx="6" fill="rgba(0,212,170,0.08)" stroke="rgba(0,212,170,0.3)" stroke-width="1.5"/>
+                <path d="M10 16h20M10 22h20M10 28h12" stroke="rgba(0,212,170,0.5)" stroke-width="1.5" stroke-linecap="round"/>
+                <text x="20" y="43" text-anchor="middle" font-size="8" fill="rgba(0,212,170,0.7)" font-family="monospace" font-weight="bold">PDF</text>
+              </svg>
+            </div>
+          </div>
+          <div class="imp-dz-title">Drop your unlocked Contract Note PDF here</div>
+          <div class="imp-dz-sub">or <span class="imp-dz-browse">click to browse</span></div>
+          <div class="imp-dz-formats">
+            <span class="imp-format-badge">05-06-2026-contract-notes_QN9226.pdf</span>
           </div>
         </div>
-        <div class="imp-dz-title">Drop your Contract Note PDF here</div>
-        <div class="imp-dz-sub">or <span class="imp-dz-browse">click to browse</span> — supports Zerodha contract notes</div>
-        <div class="imp-dz-formats">
-          <span class="imp-format-badge">05-06-2026-contract-notes_QN9226.pdf</span>
+        <div class="imp-dz-hover-overlay" id="imp-dz-overlay">
+          <div style="font-size:32px">📄</div>
+          <div style="font-size:14px;font-weight:600;color:var(--accent)">Release to upload</div>
         </div>
       </div>
-      <div class="imp-dz-hover-overlay" id="imp-dz-overlay">
-        <div style="font-size:32px">📄</div>
-        <div style="font-size:14px;font-weight:600;color:var(--accent)">Release to upload</div>
+
+      <div class="imp-file-chosen" id="imp-file-chosen" style="display:none">
+        <div class="imp-file-icon">📄</div>
+        <div class="imp-file-info">
+          <div class="imp-file-name" id="imp-file-name">contract-note.pdf</div>
+          <div class="imp-file-size" id="imp-file-size">0 KB</div>
+        </div>
+        <button class="imp-file-remove" onclick="removeFile()">✕</button>
       </div>
+
+      <!-- Still failing hint -->
+      <div class="imp-fallback-hint" id="imp-pdf-hint" style="display:none">
+        <span>⚠️ PDF still not working?</span>
+        <button onclick="selectMethod('paste');document.getElementById('method-card-paste').scrollIntoView({behavior:'smooth'})">
+          Switch to Copy &amp; Paste method →
+        </button>
+      </div>
+
+      <button class="imp-cta-btn" id="imp-extract-btn" onclick="startExtraction()" disabled style="margin-top:16px">
+        <span class="imp-cta-icon">🤖</span>
+        <span>Extract Trades with AI</span>
+        <span class="imp-cta-arrow">→</span>
+      </button>
     </div>
 
-    <!-- File chosen preview -->
-    <div class="imp-file-chosen" id="imp-file-chosen" style="display:none">
-      <div class="imp-file-icon">📄</div>
-      <div class="imp-file-info">
-        <div class="imp-file-name" id="imp-file-name">contract-note.pdf</div>
-        <div class="imp-file-size" id="imp-file-size">0 KB</div>
+    <!-- ══ METHOD 2: COPY PASTE TEXT ══ -->
+    <div id="imp-mode-paste" style="display:none">
+
+      <div class="imp-fallback-banner">
+        <span class="imp-fb-icon">💡</span>
+        <div>
+          <div class="imp-fb-title">When to use this method</div>
+          <div class="imp-fb-body">Use this if PDF upload gives an error. Open the PDF in Edge with your PAN → press <kbd>Ctrl+A</kbd> → <kbd>Ctrl+C</kbd> → click below and press <kbd>Ctrl+V</kbd></div>
+        </div>
       </div>
-      <button class="imp-file-remove" onclick="removeFile()">✕</button>
+
+      <div class="imp-paste-zone" onclick="document.getElementById('imp-paste-text').focus()">
+        <div class="imp-paste-zone-header">
+          <span class="imp-paste-zone-title">📋 Paste Contract Note Text</span>
+          <span class="imp-paste-zone-hint" id="paste-char-count">Click here, then Ctrl+V</span>
+        </div>
+        <textarea id="imp-paste-text"
+          placeholder="Paste the full copied text from your Zerodha contract note PDF here…
+
+Example of what it should look like after pasting:
+NIFTY2560524500CE  B  50  120.50  09:45:12
+NIFTY2560524500CE  S  50  185.00  14:22:33
+BANKNIFTY25JUN52000PE  B  30  95.00  10:15:44
+..."
+          oninput="checkPasteReady()"></textarea>
+        <div class="imp-paste-actions">
+          <button class="imp-paste-clear-btn" onclick="document.getElementById('imp-paste-text').value='';checkPasteReady()">✕ Clear</button>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-top:16px">
+        <div>
+          <label class="imp-label">Trade Date</label>
+          <input type="date" id="imp-paste-date"
+            style="background:var(--surface);border:1px solid var(--border);border-radius:8px;
+              color:var(--text);font-family:'Sora',sans-serif;font-size:13px;padding:9px 12px;
+              outline:none;margin-top:6px;display:block">
+        </div>
+        <div style="font-size:12px;color:var(--text3);margin-top:24px">Auto-detected from text · override only if wrong</div>
+      </div>
+
+      <button class="imp-cta-btn" id="imp-parse-btn" onclick="startParsing()" disabled style="margin-top:20px">
+        <span class="imp-cta-icon">⚡</span>
+        <span>Parse &amp; Extract Trades</span>
+        <span class="imp-cta-arrow">→</span>
+      </button>
     </div>
 
-    <button class="imp-cta-btn" id="imp-extract-btn" onclick="startExtraction()" disabled>
-      <span class="imp-cta-icon">🤖</span>
-      <span>Extract Trades with AI</span>
-      <span class="imp-cta-arrow">→</span>
-    </button>
+    <!-- ══ METHOD 3: ZERODHA CONSOLE PASTE ══ -->
+    <div id="imp-mode-csv" style="display:none">
+
+      <div class="imp-fallback-banner" style="border-color:rgba(0,149,255,0.3);background:rgba(0,149,255,0.05)">
+        <span class="imp-fb-icon">🌐</span>
+        <div>
+          <div class="imp-fb-title">How to get data from Zerodha Console</div>
+          <div class="imp-fb-body">
+            Go to <strong style="color:var(--accent2)">console.zerodha.com</strong> → <strong>Reports</strong> → <strong>Tradebook</strong> → Select date range → The trades table appears → Select all rows → Copy → Paste below
+          </div>
+        </div>
+      </div>
+
+      <div class="imp-paste-zone" style="margin-top:16px" onclick="document.getElementById('imp-csv-text').focus()">
+        <div class="imp-paste-zone-header">
+          <span class="imp-paste-zone-title">📊 Paste Tradebook Data</span>
+          <span class="imp-paste-zone-hint" id="csv-char-count">Click here, then Ctrl+V</span>
+        </div>
+        <textarea id="imp-csv-text"
+          placeholder="Paste copied rows from Zerodha Console Tradebook here…
+
+Expected columns: Symbol | Trade Type | Qty | Price | Order Time | Trade ID
+The parser will extract all F&O trades automatically."
+          oninput="checkCsvReady()"></textarea>
+        <div class="imp-paste-actions">
+          <button class="imp-paste-clear-btn" onclick="document.getElementById('imp-csv-text').value='';checkCsvReady()">✕ Clear</button>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-top:16px">
+        <div>
+          <label class="imp-label">Trade Date</label>
+          <input type="date" id="imp-csv-date"
+            style="background:var(--surface);border:1px solid var(--border);border-radius:8px;
+              color:var(--text);font-family:'Sora',sans-serif;font-size:13px;padding:9px 12px;
+              outline:none;margin-top:6px;display:block">
+        </div>
+      </div>
+
+      <button class="imp-cta-btn" id="imp-csv-btn" onclick="startCsvParsing()" disabled style="margin-top:20px">
+        <span class="imp-cta-icon">📊</span>
+        <span>Parse Tradebook &amp; Extract</span>
+        <span class="imp-cta-arrow">→</span>
+      </button>
+    </div>
+
   </div>
 
   <!-- ── STEP 2: AI Processing ── -->
@@ -2004,6 +2238,290 @@ function showToast(msg, type) {
 }
 
 // ─────────────────────────────────────────
+// METHOD SWITCHING
+// ─────────────────────────────────────────
+function selectMethod(method) {
+  ['pdf','paste','csv'].forEach(m => {
+    document.getElementById(`method-card-${m}`)?.classList.toggle('active', m === method);
+    document.getElementById(`imp-mode-${m}`)?.style && (document.getElementById(`imp-mode-${m}`).style.display = m === method ? 'block' : 'none');
+  });
+}
+
+function checkPasteReady() {
+  const text = document.getElementById('imp-paste-text').value;
+  document.getElementById('paste-char-count').textContent = text.length.toLocaleString() + ' chars pasted';
+  document.getElementById('imp-parse-btn').disabled = text.trim().length < 50;
+}
+
+function checkCsvReady() {
+  const text = document.getElementById('imp-csv-text').value;
+  document.getElementById('csv-char-count').textContent = text.length.toLocaleString() + ' chars pasted';
+  document.getElementById('imp-csv-btn').disabled = text.trim().length < 20;
+}
+
+// Console tradebook paste parser
+function startCsvParsing() {
+  const raw = document.getElementById('imp-csv-text').value;
+  if (!raw.trim()) { showToast('Please paste tradebook data first', 'error'); return; }
+
+  setStep(2);
+  document.getElementById('imp-panel-1').style.display = 'none';
+  document.getElementById('imp-panel-2').style.display = 'block';
+
+  let s = 0;
+  const emojis = ['🔍','📊','⚡','🔗','✨'];
+  const iv = setInterval(() => {
+    if (s > 0) document.getElementById(`pstep-${s}`)?.classList.replace('active','done');
+    s++;
+    if (s <= 5) {
+      document.getElementById(`pstep-${s}`)?.classList.add('active');
+      document.getElementById('imp-proc-emoji').textContent = emojis[s-1];
+    } else clearInterval(iv);
+  }, 280);
+
+  setTimeout(() => {
+    clearInterval(iv);
+    for (let i=1;i<=5;i++) {
+      document.getElementById(`pstep-${i}`)?.classList.remove('active');
+      document.getElementById(`pstep-${i}`)?.classList.add('done');
+    }
+
+    const tradeDate = document.getElementById('imp-csv-date')?.value || new Date().toISOString().split('T')[0];
+    const parsed = parseCsvText(raw, tradeDate);
+
+    if (!parsed.length) {
+      document.getElementById('imp-panel-2').style.display = 'none';
+      document.getElementById('imp-panel-1').style.display = 'block';
+      setStep(1);
+      showToast('No F&O trades found in pasted data. Make sure you copied the full tradebook table.', 'error');
+      return;
+    }
+    pendingImportTrades = parsed;
+    setTimeout(() => showPreviewPanel(parsed), 400);
+  }, 1600);
+}
+
+function parseCsvText(text, tradeDate) {
+  const results = [];
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  const lotSizeMap = {NIFTY:25,BANKNIFTY:15,SENSEX:10,FINNIFTY:40,MIDCPNIFTY:75};
+
+  lines.forEach(line => {
+    // Skip header lines
+    if (/symbol|instrument|trade type|order/i.test(line)) return;
+
+    // Split by tab or multiple spaces
+    const cols = line.split(/\t|  +/).map(c => c.trim()).filter(Boolean);
+    if (cols.length < 3) return;
+
+    // Find symbol column — looks like NIFTY25JUN24500CE or NIFTY2560524500CE
+    let symCol = cols.find(c => /^(NIFTY|BANKNIFTY|SENSEX|FINNIFTY|MIDCPNIFTY)\w+(CE|PE|FUT)$/i.test(c));
+    if (!symCol) return;
+
+    const symMatch = symCol.match(/^(NIFTY(?:BNK)?|BANKNIFTY|SENSEX|FINNIFTY|MIDCPNIFTY)\w*?(\d{4,6})(CE|PE|FUT)$/i);
+    if (!symMatch) return;
+
+    let instrument = symMatch[1].toUpperCase();
+    if (instrument.includes('BNK')) instrument = 'BANKNIFTY';
+    const strike = symMatch[2];
+    const optRaw = symMatch[3].toUpperCase();
+    const optType = optRaw === 'CE' ? 'CE (Call)' : optRaw === 'PE' ? 'PE (Put)' : 'FUT (Future)';
+
+    // Direction: B/Buy/BUY or S/Sell/SELL
+    const dirCol = cols.find(c => /^(B|S|BUY|SELL|BUY|SELL)$/i.test(c));
+    const direction = dirCol ? (dirCol.toUpperCase().startsWith('B') ? 'BUY' : 'SELL') : '';
+
+    // Price: decimal
+    const prices = cols.filter(c => /^\d{1,5}\.\d{2}$/.test(c));
+    const entry = prices[0] || '';
+
+    // Qty
+    const qtyCol = cols.find(c => /^\d{2,6}$/.test(c) && parseInt(c) >= 10);
+    const qty = qtyCol ? parseInt(qtyCol) : 0;
+    const ls = lotSizeMap[instrument] || 25;
+    const lots = qty >= ls ? String(Math.round(qty/ls)) : '1';
+
+    // Time
+    const timeCol = cols.find(c => /\d{1,2}:\d{2}/.test(c));
+    const timeMatch = timeCol?.match(/(\d{1,2}):(\d{2})/);
+    const time = timeMatch ? `${timeMatch[1].padStart(2,'0')}:${timeMatch[2]}` : '';
+
+    let session = '';
+    if (time) {
+      const mins = parseInt(time.split(':')[0])*60 + parseInt(time.split(':')[1]);
+      if (mins < 600) session = 'Opening (9:15–10:00)';
+      else if (mins < 720) session = 'Mid-Morning (10:00–12:00)';
+      else if (mins < 840) session = 'Post-Lunch (12:00–14:00)';
+      else session = 'Closing (14:00–15:30)';
+    }
+
+    const isDupe = results.some(t =>
+      t.instrument === instrument && t.strike === strike &&
+      t.direction === direction && t.entry === entry
+    );
+    if (!isDupe) {
+      results.push({
+        date: tradeDate, time, instrument, optType, strike,
+        expiry: '', direction, lots, entry, exit: '',
+        session, exitReason: 'Still Open',
+        grossPnL: null, tags: 'zerodha-console-import'
+      });
+    }
+  });
+
+  return results;
+}
+
+// ─────────────────────────────────────────
+// PASTE TEXT PARSER — Zerodha contract note
+// Zero API calls — pure regex pattern matching
+// ─────────────────────────────────────────
+function startParsing() {
+  const raw = document.getElementById('imp-paste-text').value;
+  if (!raw.trim()) { showToast('Please paste contract note text first', 'error'); return; }
+
+  setStep(2);
+  document.getElementById('imp-panel-1').style.display = 'none';
+  document.getElementById('imp-panel-2').style.display = 'block';
+
+  // Animate steps instantly (local parse is fast)
+  let s = 0;
+  const emojis = ['🔍','📊','⚡','🔗','✨'];
+  const iv = setInterval(() => {
+    if (s > 0) { document.getElementById(`pstep-${s}`)?.classList.replace('active','done'); }
+    s++;
+    if (s <= 5) {
+      document.getElementById(`pstep-${s}`)?.classList.add('active');
+      document.getElementById('imp-proc-emoji').textContent = emojis[s-1];
+    } else { clearInterval(iv); }
+  }, 300);
+
+  setTimeout(() => {
+    clearInterval(iv);
+    for (let i=1;i<=5;i++) {
+      const el = document.getElementById(`pstep-${i}`);
+      el?.classList.remove('active'); el?.classList.add('done');
+    }
+
+    const parsed = parseZerodhaText(raw);
+
+    if (!parsed.length) {
+      document.getElementById('imp-panel-2').style.display = 'none';
+      document.getElementById('imp-panel-1').style.display = 'block';
+      setStep(1);
+      showToast('No F&O trades found. Make sure you copied the full PDF text.', 'error');
+      return;
+    }
+    pendingImportTrades = parsed;
+    setTimeout(() => showPreviewPanel(parsed), 400);
+  }, 1800);
+}
+
+function parseZerodhaText(text) {
+  const results = [];
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+
+  // Detect trade date from filename pattern or header
+  let tradeDate = document.getElementById('imp-paste-date')?.value || '';
+  if (!tradeDate) {
+    const dm = text.match(/(\d{1,2})[\/-](\d{1,2})[\/-](202\d)/);
+    if (dm) tradeDate = `${dm[3]}-${dm[2].padStart(2,'0')}-${dm[1].padStart(2,'0')}`;
+    if (!tradeDate) tradeDate = new Date().toISOString().split('T')[0];
+  }
+
+  // Zerodha contract note symbol patterns:
+  // NIFTY25JUN24500CE, BANKNIFTY25JUN52000PE, SENSEX25JUN82000CE
+  // Also: NIFTY2560524500CE (compact: YY + expiry month number + DD + strike + CE/PE)
+  const symRE = /\b(NIFTY(?:BNK|BK)?|BANKNIFTY|SENSEX|FINNIFTY|MIDCPNIFTY)\w*?(\d{4,6})(CE|PE|FUT)\b/gi;
+
+  // Find all symbol occurrences with their line context
+  const fullText = lines.join(' ');
+  let m;
+  const symbolMatches = [];
+  while ((m = symRE.exec(fullText)) !== null) {
+    symbolMatches.push({ full: m[0], base: m[1].toUpperCase(), strike: m[2], type: m[3], idx: m.index });
+  }
+
+  if (!symbolMatches.length) return [];
+
+  // For each symbol match, look for nearby B/S, qty, price in surrounding text
+  symbolMatches.forEach(sym => {
+    const context = fullText.substring(Math.max(0, sym.idx - 60), sym.idx + 120);
+
+    // Direction: look for standalone B or S (Buy/Sell)
+    const dirMatch = context.match(/\b([BS])\b/);
+    const direction = dirMatch ? (dirMatch[1] === 'B' ? 'BUY' : 'SELL') : '';
+
+    // Price: decimal number like 120.50 or 1234.00
+    const prices = [...context.matchAll(/\b(\d{1,5}\.\d{2})\b/g)].map(x => x[1]);
+    const entry = prices[0] || '';
+    const exit  = prices[1] || '';
+
+    // Qty: whole number before or after symbol
+    const qtyMatch = context.match(/\b(\d{2,6})\b/);
+    const qty = qtyMatch ? parseInt(qtyMatch[1]) : 0;
+
+    // Instrument normalisation
+    let instrument = sym.base;
+    if (instrument.includes('BNK') || instrument.includes('BANKN')) instrument = 'BANKNIFTY';
+    else if (instrument === 'NIFTY') instrument = 'NIFTY';
+    else if (instrument === 'SENSEX') instrument = 'SENSEX';
+    else if (instrument === 'FINNIFTY') instrument = 'FINNIFTY';
+    else if (instrument === 'MIDCPNIFTY') instrument = 'MIDCPNIFTY';
+
+    const lotSizeMap = {NIFTY:25,BANKNIFTY:15,SENSEX:10,FINNIFTY:40,MIDCPNIFTY:75};
+    const ls = lotSizeMap[instrument] || 25;
+    const lots = qty >= ls ? Math.round(qty / ls) : 1;
+
+    // Time: HH:MM pattern
+    const timeMatch = context.match(/\b(\d{1,2}):(\d{2})(?::\d{2})?\b/);
+    const time = timeMatch ? `${timeMatch[1].padStart(2,'0')}:${timeMatch[2]}` : '';
+
+    // Session
+    let session = '';
+    if (time) {
+      const h = parseInt(time.split(':')[0]);
+      const min = parseInt(time.split(':')[1]);
+      const total = h * 60 + min;
+      if (total < 600) session = 'Opening (9:15–10:00)';
+      else if (total < 720) session = 'Mid-Morning (10:00–12:00)';
+      else if (total < 840) session = 'Post-Lunch (12:00–14:00)';
+      else session = 'Closing (14:00–15:30)';
+    }
+
+    // Expiry — try to parse from symbol
+    let expiry = '';
+    const expiryM = sym.full.match(/(\d{2})(\d{2})(\d{2})(CE|PE|FUT)/i);
+    if (expiryM) {
+      const yy = '20' + expiryM[1];
+      const mo = expiryM[2].padStart(2,'0');
+      const dd = expiryM[3].padStart(2,'0');
+      expiry = `${yy}-${mo}-${dd}`;
+    }
+
+    const optType = sym.type === 'CE' ? 'CE (Call)' : sym.type === 'PE' ? 'PE (Put)' : 'FUT (Future)';
+
+    // Avoid pure duplicate entries
+    const isDupe = results.some(t =>
+      t.instrument === instrument && t.strike === sym.strike &&
+      t.direction === direction && t.entry === entry
+    );
+    if (!isDupe) {
+      results.push({
+        date: tradeDate, time, instrument,
+        optType, strike: sym.strike, expiry,
+        direction, lots: String(lots), entry, exit,
+        session,
+        exitReason: exit ? 'Manual Exit (Profit)' : 'Still Open',
+        grossPnL: null, tags: 'zerodha-paste-import'
+      });
+    }
+  });
+
+  return results;
+}
+
+// ─────────────────────────────────────────
 // IMPORT PAGE — PDF UPLOAD + AI EXTRACTION
 // ─────────────────────────────────────────
 let importFile = null;
@@ -2138,17 +2656,20 @@ If no F&O trades found, return: []`
     });
 
     clearInterval(stepInterval);
-    // Mark all steps done
     for (let i = 1; i <= 5; i++) {
       document.getElementById(`pstep-${i}`)?.classList.add('done');
       document.getElementById(`pstep-${i}`)?.classList.remove('active');
     }
 
     if (!response.ok) {
-      throw new Error(`API error ${response.status}: ${response.statusText}`);
+      const errData = await response.json().catch(() => ({}));
+      const errMsg = errData?.error?.message || response.statusText || 'Unknown error';
+      throw new Error(`API error ${response.status}: ${errMsg}`);
     }
 
     const data = await response.json();
+    if (data.error) throw new Error(data.error.message);
+
     const text = data.content?.filter(b => b.type === 'text').map(b => b.text).join('') || '';
 
     let parsed = [];
@@ -2161,21 +2682,30 @@ If no F&O trades found, return: []`
     }
 
     if (!Array.isArray(parsed) || parsed.length === 0) {
-      // If PDF is password-protected and Claude couldn't read it
-      showImportError('Could not extract trades. The PDF may still be password-protected. Please open it with your PAN in a PDF reader first, then re-save and upload.');
+      showImportError('No F&O trades found in this PDF. Try the FREE Paste method instead — open PDF in Edge, press Ctrl+A → Ctrl+C, then switch to "Paste Contract Text" tab.');
       return;
     }
 
-    // Tag with date
     const date = tradeDate || new Date().toISOString().split('T')[0];
     pendingImportTrades = parsed.map(t => ({ ...t, date: t.date || date, tags: 'zerodha-import' }));
 
-    await new Promise(r => setTimeout(r, 600)); // brief pause for UX
+    await new Promise(r => setTimeout(r, 600));
     showPreviewPanel(pendingImportTrades);
 
   } catch (err) {
     clearInterval(stepInterval);
-    showImportError('Error: ' + err.message + '. Make sure you are connected to the internet and the PDF is not password-locked.');
+    let friendly = err.message || 'Unknown error';
+    if (friendly.includes('400')) {
+      friendly = 'PDF could not be read (Error 400). The file may have rendering issues. Please try the FREE Paste method — open PDF in Edge → Ctrl+A → Ctrl+C → switch to Paste tab.';
+    } else if (friendly.includes('401')) {
+      friendly = 'Invalid API key. Click 🔑 API Key (bottom-left) and re-enter your key.';
+      localStorage.removeItem('fno_api_key');
+    } else if (friendly.includes('429')) {
+      friendly = 'Too many requests. Please wait 30 seconds and try again.';
+    } else if (friendly.includes('fetch')) {
+      friendly = 'Network error. Check your internet connection and try again.';
+    }
+    showImportError(friendly);
   }
 }
 
@@ -2245,46 +2775,82 @@ function showPreviewPanel(extracted) {
 function confirmImport() {
   if (!pendingImportTrades.length) return;
   const now = Date.now();
-  const toAdd = pendingImportTrades.map((t, i) => ({
-    id: now + i,
-    date: t.date || '',
-    time: t.time || '',
-    instrument: t.instrument || '',
-    expiry: t.expiry || '',
-    optType: t.optType || '',
-    strike: t.strike || '',
-    direction: t.direction || '',
-    lots: t.lots || '1',
-    entry: t.entry || '',
-    exit: t.exit || '',
-    sl: '', target: '', spot: '', vix: '', pcr: '',
-    trend: '', session: t.session || '',
-    setup: '', bias: '', confidence: '',
-    emotion: '', exitReason: t.exitReason || (t.exit ? 'Manual Exit (Profit)' : 'Still Open'),
-    rules: '', mistake: '',
-    analysis: `Auto-imported from Zerodha contract note (${t.date})`,
-    notes: '',
-    tags: 'zerodha-import',
-    importedFrom: 'zerodha-pdf'
-  }));
-  trades.unshift(...toAdd);
+
+  // ── Duplicate detection ──
+  // A trade is a duplicate if same date + instrument + strike + optType + direction + entry already exists
+  const newTrades = [];
+  const skipped = [];
+  pendingImportTrades.forEach((t, i) => {
+    const isDupe = trades.some(ex =>
+      ex.date === (t.date || '') &&
+      ex.instrument === (t.instrument || '') &&
+      ex.strike === (t.strike || '') &&
+      ex.optType === (t.optType || '') &&
+      ex.direction === (t.direction || '') &&
+      ex.entry === (t.entry || '')
+    );
+    if (isDupe) {
+      skipped.push(t);
+    } else {
+      newTrades.push({
+        id: now + i,
+        date: t.date || '',
+        time: t.time || '',
+        instrument: t.instrument || '',
+        expiry: t.expiry || '',
+        optType: t.optType || '',
+        strike: t.strike || '',
+        direction: t.direction || '',
+        lots: t.lots || '1',
+        entry: t.entry || '',
+        exit: t.exit || '',
+        sl: '', target: '', spot: '', vix: '', pcr: '',
+        trend: '', session: t.session || '',
+        setup: '', bias: '', confidence: '',
+        emotion: '', exitReason: t.exitReason || (t.exit ? 'Manual Exit (Profit)' : 'Still Open'),
+        rules: '', mistake: '',
+        analysis: `Auto-imported from Zerodha contract note (${t.date})`,
+        notes: '',
+        tags: 'zerodha-import',
+        importedFrom: 'zerodha-pdf'
+      });
+    }
+  });
+
+  if (!newTrades.length) {
+    // All trades were duplicates
+    document.getElementById('imp-panel-3').style.display = 'none';
+    document.getElementById('imp-panel-success').style.display = 'block';
+    setStep(3);
+    document.getElementById('imp-success-msg').textContent =
+      `⚠️ All ${skipped.length} trade(s) from this file were already in your journal — no duplicates added.`;
+    pendingImportTrades = [];
+    return;
+  }
+
+  trades.unshift(...newTrades);
   saveTrades();
   updateHeaderPnL();
 
-  // Show success
   setStep(3);
   document.getElementById('imp-panel-3').style.display = 'none';
   document.getElementById('imp-panel-success').style.display = 'block';
-  document.getElementById('imp-success-msg').textContent =
-    `${toAdd.length} trade(s) from ${toAdd[0]?.date || 'contract note'} added to your journal. Now add SL, targets & psychology in the Trade Log.`;
+
+  let msg = `${newTrades.length} trade(s) imported successfully.`;
+  if (skipped.length > 0) msg += ` ${skipped.length} duplicate(s) skipped.`;
+  msg += ` Now add SL, targets & psychology in the Trade Log.`;
+  document.getElementById('imp-success-msg').textContent = msg;
   pendingImportTrades = [];
-  showToast(`✅ ${toAdd.length} trade(s) imported!`);
+  showToast(`✅ ${newTrades.length} imported · ${skipped.length} duplicates skipped`);
 }
 
 function showImportError(msg) {
   setStep(1);
   document.getElementById('imp-panel-2').style.display = 'none';
   document.getElementById('imp-panel-1').style.display = 'block';
+  // Show the fallback hint automatically
+  const hint = document.getElementById('imp-pdf-hint');
+  if (hint) hint.style.display = 'flex';
   showToast(msg, 'error');
 }
 
@@ -2299,6 +2865,8 @@ function resetImport() {
   document.getElementById('imp-dropzone').style.display = 'block';
   document.getElementById('imp-extract-btn').disabled = true;
   document.getElementById('imp-file').value = '';
+  const hint = document.getElementById('imp-pdf-hint');
+  if (hint) hint.style.display = 'none';
   // Reset step dots
   for (let i = 1; i <= 5; i++) {
     document.getElementById(`pstep-${i}`)?.classList.remove('active', 'done');
