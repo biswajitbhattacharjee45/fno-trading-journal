@@ -1885,9 +1885,38 @@ function renderInsights() {
 }
 
 // ─────────────────────────────────────────
+// API KEY MANAGEMENT
+// ─────────────────────────────────────────
+function getApiKey() {
+  return localStorage.getItem('fno_api_key') || '';
+}
+function saveApiKey() {
+  const k = document.getElementById('api-key-input').value.trim();
+  if (!k.startsWith('sk-ant-')) { showToast('Invalid key — must start with sk-ant-', 'error'); return; }
+  localStorage.setItem('fno_api_key', k);
+  document.getElementById('api-key-modal').style.display = 'none';
+  showToast('✅ API key saved!');
+  // Retry whatever was pending
+  if (window._pendingAction) { window._pendingAction(); window._pendingAction = null; }
+}
+function checkApiKey(retryFn) {
+  if (getApiKey()) return true;
+  window._pendingAction = retryFn;
+  document.getElementById('api-key-modal').style.display = 'flex';
+  return false;
+}
+function removeApiKey() {
+  if (confirm('Remove saved API key?')) {
+    localStorage.removeItem('fno_api_key');
+    showToast('API key removed');
+  }
+}
+
+// ─────────────────────────────────────────
 // AI ANALYSIS
 // ─────────────────────────────────────────
 async function askAI(mode) {
+  if (!checkApiKey(() => askAI(mode))) return;
   const closed = trades.filter(t => calcPnL(t) !== null);
   if (!closed.length) { showToast('No closed trades to analyse', 'error'); return; }
 
@@ -1901,7 +1930,6 @@ async function askAI(mode) {
   out.innerHTML = `<div class="ai-thinking"><div class="ai-dot"></div><div class="ai-dot"></div><div class="ai-dot"></div></div>`;
   out.className = 'loading';
 
-  // Prepare compact trade summary
   const summary = closed.slice(0, 60).map(t => {
     const pnl = calcPnL(t);
     return `${t.date} ${t.instrument} ${t.optType} ${t.direction} ${t.lots}L entry₹${t.entry} exit₹${t.exit||'?'} P&L₹${pnl} outcome:${getOutcome(pnl)} setup:${t.setup||'?'} emotion:${t.emotion||'?'} mistake:${t.mistake||'?'} rules:${t.rules||'?'}`;
@@ -1926,7 +1954,12 @@ Provide a direct, actionable response. Use specific numbers from the data. Be li
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': getApiKey(),
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 1000,
@@ -1934,12 +1967,18 @@ Provide a direct, actionable response. Use specific numbers from the data. Be li
       })
     });
     const data = await res.json();
+    if (data.error) throw new Error(data.error.message);
     const text = data.content?.[0]?.text || 'No response received.';
     out.className = '';
     out.innerHTML = text.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/^• /gm, '&bull; ');
   } catch(e) {
     out.className = '';
-    out.innerHTML = `<span style="color:var(--red)">Error connecting to AI. Please try again.</span>`;
+    if (e.message?.includes('401') || e.message?.includes('auth')) {
+      localStorage.removeItem('fno_api_key');
+      out.innerHTML = `<span style="color:var(--red)">Invalid API key. <a href="#" onclick="document.getElementById('api-key-modal').style.display='flex'" style="color:var(--accent)">Enter a new key</a></span>`;
+    } else {
+      out.innerHTML = `<span style="color:var(--red)">Error: ${e.message}</span>`;
+    }
   }
 }
 
@@ -2017,6 +2056,7 @@ function removeFile() {
 // ── Extract ──
 async function startExtraction() {
   if (!importFile) { showToast('Please upload a PDF first', 'error'); return; }
+  if (!checkApiKey(() => startExtraction())) return;
 
   // Advance to step 2
   setStep(2);
@@ -2049,7 +2089,12 @@ async function startExtraction() {
     // Call Claude API with PDF
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': getApiKey(),
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 1000,
@@ -2305,8 +2350,97 @@ function loadSampleData() {
 }
 </script>
 
-<div style="position:fixed;bottom:16px;left:16px;z-index:99">
+<!-- ══════════════ API KEY MODAL ══════════════ -->
+<div id="api-key-modal" style="display:none;position:fixed;inset:0;z-index:9000;
+  background:rgba(0,0,0,0.85);backdrop-filter:blur(8px);
+  align-items:center;justify-content:center;padding:20px">
+  <div style="background:#141820;border:1px solid #252f3d;border-radius:16px;
+    padding:32px;width:100%;max-width:480px;animation:imp-panel-in 0.3s ease">
+
+    <!-- Header -->
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:24px">
+      <div style="width:48px;height:48px;border-radius:12px;background:rgba(0,212,170,0.1);
+        border:1px solid rgba(0,212,170,0.2);display:flex;align-items:center;justify-content:center;font-size:22px">🔑</div>
+      <div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:1.5px;color:#e8edf5">
+          Anthropic API Key Required
+        </div>
+        <div style="font-size:12px;color:#8494a8;margin-top:2px">One-time setup · Saved securely in your browser</div>
+      </div>
+    </div>
+
+    <!-- Why needed -->
+    <div style="background:#0f1218;border:1px solid #1e2530;border-radius:10px;
+      padding:14px 16px;margin-bottom:20px;font-size:13px;color:#8494a8;line-height:1.7">
+      This app uses <b style="color:#e8edf5">Claude AI</b> to extract trades from your PDF and analyse your journal.
+      A free API key from Anthropic is needed to power these features.
+    </div>
+
+    <!-- Steps to get key -->
+    <div style="margin-bottom:20px">
+      <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;
+        color:#8494a8;margin-bottom:10px">How to get your free API key:</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;gap:10px;align-items:flex-start;font-size:13px;color:#8494a8">
+          <span style="background:#00d4aa;color:#000;border-radius:50%;width:20px;height:20px;
+            display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;margin-top:1px">1</span>
+          Go to <a href="https://console.anthropic.com" target="_blank"
+            style="color:#00d4aa;margin:0 4px">console.anthropic.com</a> and sign up free
+        </div>
+        <div style="display:flex;gap:10px;align-items:flex-start;font-size:13px;color:#8494a8">
+          <span style="background:#00d4aa;color:#000;border-radius:50%;width:20px;height:20px;
+            display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;margin-top:1px">2</span>
+          Click <b style="color:#e8edf5">API Keys</b> → <b style="color:#e8edf5">Create Key</b>
+        </div>
+        <div style="display:flex;gap:10px;align-items:flex-start;font-size:13px;color:#8494a8">
+          <span style="background:#00d4aa;color:#000;border-radius:50%;width:20px;height:20px;
+            display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;margin-top:1px">3</span>
+          Copy the key (starts with <span style="font-family:'JetBrains Mono',monospace;
+            color:#00d4aa;font-size:12px">sk-ant-</span>) and paste below
+        </div>
+      </div>
+    </div>
+
+    <!-- Input -->
+    <div style="margin-bottom:16px">
+      <label style="display:block;font-size:11px;font-weight:700;letter-spacing:1px;
+        text-transform:uppercase;color:#8494a8;margin-bottom:8px">Your API Key</label>
+      <div style="display:flex;align-items:center;background:#0f1218;border:1px solid #1e2530;
+        border-radius:10px;overflow:hidden;transition:border-color 0.2s"
+        onfocusin="this.style.borderColor='#00d4aa'" onfocusout="this.style.borderColor='#1e2530'">
+        <span style="padding:0 12px;font-size:16px">🔐</span>
+        <input type="password" id="api-key-input" placeholder="sk-ant-api03-..."
+          style="flex:1;background:none;border:none;outline:none;color:#e8edf5;
+            font-family:'JetBrains Mono',monospace;font-size:13px;padding:12px 0;letter-spacing:1px"
+          onkeydown="if(event.key==='Enter')saveApiKey()">
+        <button onclick="const i=document.getElementById('api-key-input');i.type=i.type==='password'?'text':'password'"
+          style="background:none;border:none;cursor:pointer;padding:0 14px;font-size:16px;opacity:0.5">👁</button>
+      </div>
+      <div style="font-size:11px;color:#4a5568;margin-top:6px">
+        🔒 Stored only in your browser's localStorage · Never sent anywhere except Anthropic
+      </div>
+    </div>
+
+    <!-- Buttons -->
+    <button onclick="saveApiKey()"
+      style="width:100%;padding:13px;border-radius:10px;border:none;cursor:pointer;
+        background:linear-gradient(135deg,#00d4aa,#00b890);color:#000;
+        font-family:'Sora',sans-serif;font-size:15px;font-weight:700;
+        box-shadow:0 4px 20px rgba(0,212,170,0.2);transition:all 0.2s;margin-bottom:10px"
+      onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''">
+      💾 Save API Key &amp; Continue
+    </button>
+    <button onclick="document.getElementById('api-key-modal').style.display='none'"
+      style="width:100%;padding:11px;border-radius:10px;border:1px solid #1e2530;
+        background:none;color:#8494a8;font-family:'Sora',sans-serif;font-size:13px;cursor:pointer">
+      Cancel
+    </button>
+  </div>
+</div>
+
+<div style="position:fixed;bottom:16px;left:16px;z-index:99;display:flex;gap:8px;flex-direction:column">
   <button class="btn btn-ghost" style="font-size:11px;padding:6px 12px;opacity:0.6" onclick="loadSampleData()">Load Sample Data</button>
+  <button class="btn btn-ghost" style="font-size:11px;padding:6px 12px;opacity:0.4" onclick="document.getElementById('api-key-modal').style.display='flex'">🔑 API Key</button>
 </div>
 
 </body>
