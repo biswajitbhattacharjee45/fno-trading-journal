@@ -961,31 +961,31 @@
         <div class="imp-howto-card">
           <div class="imp-howto-icon">📧</div>
           <div class="imp-howto-step">Step A</div>
-          <div class="imp-howto-text">Open Zerodha contract note email &amp; download PDF</div>
+          <div class="imp-howto-text">Download all contract note PDFs from Zerodha Gmail</div>
         </div>
         <div class="imp-howto-card">
           <div class="imp-howto-icon">🔑</div>
           <div class="imp-howto-step">Step B</div>
-          <div class="imp-howto-text">Open in Edge → enter PAN as password</div>
-        </div>
-        <div class="imp-howto-card">
-          <div class="imp-howto-icon">🖨️</div>
-          <div class="imp-howto-step">Step C</div>
-          <div class="imp-howto-text">Ctrl+P → Save as PDF → saves an unlocked copy</div>
+          <div class="imp-howto-text">Open each in Edge → enter PAN → Ctrl+P → Save as PDF (unlocked)</div>
         </div>
         <div class="imp-howto-card">
           <div class="imp-howto-icon">📤</div>
+          <div class="imp-howto-step">Step C</div>
+          <div class="imp-howto-text">Drop ALL unlocked PDFs here at once — up to 10 files</div>
+        </div>
+        <div class="imp-howto-card">
+          <div class="imp-howto-icon">⚡</div>
           <div class="imp-howto-step">Step D</div>
-          <div class="imp-howto-text">Upload that saved PDF below — AI reads all trades</div>
+          <div class="imp-howto-text">Click Extract — AI processes each file, deduplicates automatically</div>
         </div>
       </div>
 
-      <!-- Drop zone -->
+      <!-- Multi-file drop zone -->
       <div class="imp-dropzone" id="imp-dropzone" style="margin-top:20px"
            ondragover="dzDragOver(event)" ondragleave="dzDragLeave()"
            ondrop="dzDrop(event)" onclick="document.getElementById('imp-file').click()">
-        <input type="file" id="imp-file" accept=".pdf" style="display:none" onchange="dzFileChosen(event)">
-        <div class="imp-dz-inner">
+        <input type="file" id="imp-file" accept=".pdf" multiple style="display:none" onchange="dzFileChosen(event)">
+        <div class="imp-dz-inner" id="imp-dz-inner-default">
           <div class="imp-dz-orbit">
             <div class="imp-dz-orbit-ring"></div>
             <div class="imp-dz-orbit-dot"></div>
@@ -997,25 +997,53 @@
               </svg>
             </div>
           </div>
-          <div class="imp-dz-title">Drop your unlocked Contract Note PDF here</div>
-          <div class="imp-dz-sub">or <span class="imp-dz-browse">click to browse</span></div>
+          <div class="imp-dz-title">Drop multiple Contract Note PDFs here</div>
+          <div class="imp-dz-sub">or <span class="imp-dz-browse">click to browse</span> — select multiple files at once</div>
           <div class="imp-dz-formats">
-            <span class="imp-format-badge">05-06-2026-contract-notes_QN9226.pdf</span>
+            <span class="imp-format-badge">Select all dates at once · Max 10 PDFs</span>
           </div>
         </div>
         <div class="imp-dz-hover-overlay" id="imp-dz-overlay">
           <div style="font-size:32px">📄</div>
-          <div style="font-size:14px;font-weight:600;color:var(--accent)">Release to upload</div>
+          <div style="font-size:14px;font-weight:600;color:var(--accent)">Release to upload all</div>
         </div>
       </div>
 
-      <div class="imp-file-chosen" id="imp-file-chosen" style="display:none">
-        <div class="imp-file-icon">📄</div>
-        <div class="imp-file-info">
-          <div class="imp-file-name" id="imp-file-name">contract-note.pdf</div>
-          <div class="imp-file-size" id="imp-file-size">0 KB</div>
+      <!-- Multi-file queue list -->
+      <div id="imp-file-queue" style="display:none;margin-top:16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <div style="font-size:12px;font-weight:700;color:var(--text2);letter-spacing:0.8px;text-transform:uppercase">
+            Files Queued — <span id="queue-count">0</span> PDF(s)
+          </div>
+          <div style="display:flex;gap:8px">
+            <button onclick="document.getElementById('imp-file').click()"
+              style="background:var(--border);border:none;border-radius:6px;color:var(--text2);
+                font-size:12px;padding:5px 12px;cursor:pointer;font-family:'Sora',sans-serif">
+              + Add More
+            </button>
+            <button onclick="clearFileQueue()"
+              style="background:rgba(255,77,109,0.1);border:1px solid rgba(255,77,109,0.2);
+                border-radius:6px;color:var(--red);font-size:12px;padding:5px 12px;
+                cursor:pointer;font-family:'Sora',sans-serif">
+              Clear All
+            </button>
+          </div>
         </div>
-        <button class="imp-file-remove" onclick="removeFile()">✕</button>
+        <div id="imp-file-list"></div>
+      </div>
+
+      <!-- Batch progress -->
+      <div id="imp-batch-progress" style="display:none;margin-top:16px">
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px">
+          <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:12px">
+            Processing <span id="batch-current">0</span> of <span id="batch-total">0</span> files…
+          </div>
+          <div id="batch-file-statuses"></div>
+          <div style="margin-top:12px;height:6px;background:var(--border);border-radius:99px;overflow:hidden">
+            <div id="batch-progress-bar" style="height:100%;background:var(--accent);border-radius:99px;
+              width:0%;transition:width 0.4s ease"></div>
+          </div>
+        </div>
       </div>
 
       <!-- Still failing hint -->
@@ -1026,9 +1054,9 @@
         </button>
       </div>
 
-      <button class="imp-cta-btn" id="imp-extract-btn" onclick="startExtraction()" disabled style="margin-top:16px">
+      <button class="imp-cta-btn" id="imp-extract-btn" onclick="startBatchExtraction()" disabled style="margin-top:16px">
         <span class="imp-cta-icon">🤖</span>
-        <span>Extract Trades with AI</span>
+        <span id="imp-extract-label">Extract Trades with AI</span>
         <span class="imp-cta-arrow">→</span>
       </button>
     </div>
@@ -1454,6 +1482,24 @@ The parser will extract all F&O trades automatically."
 
   <div class="stats-grid" id="log-stats"></div>
 
+  <!-- Incomplete trades repair panel -->
+  <div id="repair-panel" style="display:none;margin-bottom:20px">
+    <div style="background:rgba(255,179,71,0.06);border:1px solid rgba(255,179,71,0.25);
+      border-radius:14px;padding:20px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+        <div>
+          <div style="font-size:15px;font-weight:700;color:var(--warn)">⚠️ Incomplete Trades Detected</div>
+          <div style="font-size:12px;color:var(--text2);margin-top:3px">These trades have missing entry or exit prices. Pair them up to calculate P&L correctly.</div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-primary" style="font-size:12px;padding:7px 16px" onclick="autoRepairAll()">⚡ Auto-Pair All</button>
+          <button class="btn btn-ghost" style="font-size:12px;padding:7px 14px" onclick="document.getElementById('repair-panel').style.display='none'">✕ Dismiss</button>
+        </div>
+      </div>
+      <div id="repair-groups"></div>
+    </div>
+  </div>
+
   <!-- Merge bar — shown when trades selected -->
   <div id="merge-bar" style="display:none;align-items:center;gap:12px;flex-wrap:wrap;
     background:rgba(0,149,255,0.08);border:1px solid rgba(0,149,255,0.25);
@@ -1483,6 +1529,8 @@ The parser will extract all F&O trades automatically."
       <select id="filter-month" onchange="renderTrades()">
         <option value="">All Months</option>
       </select>
+      <button class="btn btn-ghost" style="font-size:13px;padding:8px 14px" onclick="showRepairPanel()">🔧 Fix Missing Data</button>
+      <button class="btn btn-ghost" style="font-size:13px;padding:8px 14px" onclick="removeAllDuplicates()">🧹 Remove Duplicates</button>
       <button class="btn btn-danger" onclick="if(confirm('Clear ALL trades?')){clearAllTrades()}">🗑 Clear All</button>
     </div>
     <div class="table-wrap">
@@ -2765,6 +2813,160 @@ function parseZerodhaText(text) {
   return results;
 }
 
+function removeAllDuplicates() {
+  const before = trades.length;
+  const seen = new Set();
+  trades = trades.filter(t => {
+    const key = `${t.date}|${t.instrument}|${t.strike}|${t.optType}|${t.direction}|${t.entry}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  const removed = before - trades.length;
+  saveTrades();
+  updateHeaderPnL();
+  renderTrades();
+  renderLogStats();
+  if (removed > 0) showToast(`🧹 Removed ${removed} duplicate trade(s)`);
+  else showToast('✅ No duplicates found');
+}
+
+// ─────────────────────────────────────────
+// REPAIR PANEL — fix incomplete trades
+// ─────────────────────────────────────────
+function showRepairPanel() {
+  const incomplete = trades.filter(t => !t.exit || !t.entry);
+  const panel = document.getElementById('repair-panel');
+  const groups = document.getElementById('repair-groups');
+  if (!incomplete.length) {
+    showToast('✅ No incomplete trades found!'); return;
+  }
+
+  // Group incomplete trades by date + instrument + optType
+  const grouped = {};
+  incomplete.forEach(t => {
+    const key = `${t.date} · ${t.instrument} ${t.optType}`;
+    if (!grouped[key]) grouped[key] = { buys: [], sells: [] };
+    if (t.direction === 'BUY')  grouped[key].buys.push(t);
+    else                         grouped[key].sells.push(t);
+  });
+
+  groups.innerHTML = Object.entries(grouped).map(([key, g]) => {
+    const buyRows = g.buys.map(t => `
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;
+        background:rgba(0,212,170,0.06);border:1px solid rgba(0,212,170,0.15);
+        border-radius:8px;margin-bottom:6px;flex-wrap:wrap">
+        <span class="badge badge-buy">BUY</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600">${t.strike}</span>
+        <span style="font-size:12px;color:var(--text2)">Entry: ${t.entry ? '₹'+t.entry : '<span style="color:var(--warn)">⚠️ Missing</span>'}</span>
+        <span style="font-size:12px;color:var(--text2)">Exit: ${t.exit ? '₹'+t.exit : '<span style="color:var(--text3)">—</span>'}</span>
+        <span style="font-size:11px;color:var(--text3)">${t.time||''}</span>
+        <div style="margin-left:auto;display:flex;gap:6px;align-items:center">
+          <input type="number" placeholder="Entry ₹" step="0.05"
+            value="${t.entry||''}"
+            style="width:90px;background:var(--surface);border:1px solid var(--border);
+              border-radius:6px;color:var(--text);font-size:12px;padding:5px 8px"
+            id="repair-entry-${t.id}">
+          <input type="number" placeholder="Exit ₹" step="0.05"
+            value="${t.exit||''}"
+            style="width:90px;background:var(--surface);border:1px solid var(--border);
+              border-radius:6px;color:var(--text);font-size:12px;padding:5px 8px"
+            id="repair-exit-${t.id}">
+          <button onclick="applyRepair(${t.id})"
+            style="background:var(--accent);color:#000;border:none;border-radius:6px;
+              font-size:11px;font-weight:700;padding:5px 12px;cursor:pointer">✓ Save</button>
+          <button onclick="deleteTrade(${t.id})"
+            style="background:rgba(255,77,109,0.1);color:var(--red);border:1px solid rgba(255,77,109,0.2);
+              border-radius:6px;font-size:11px;padding:5px 10px;cursor:pointer">✕</button>
+        </div>
+      </div>`).join('');
+
+    const sellRows = g.sells.map(t => `
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;
+        background:rgba(255,77,109,0.06);border:1px solid rgba(255,77,109,0.15);
+        border-radius:8px;margin-bottom:6px;flex-wrap:wrap">
+        <span class="badge badge-sell">SELL</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600">${t.strike}</span>
+        <span style="font-size:12px;color:var(--text2)">Entry: ${t.entry ? '₹'+t.entry : '<span style="color:var(--warn)">⚠️ Missing</span>'}</span>
+        <span style="font-size:12px;color:var(--text2)">Exit: ${t.exit ? '₹'+t.exit : '<span style="color:var(--text3)">—</span>'}</span>
+        <span style="font-size:11px;color:var(--text3)">${t.time||''}</span>
+        <div style="margin-left:auto;display:flex;gap:6px;align-items:center">
+          <input type="number" placeholder="Entry ₹" step="0.05"
+            value="${t.entry||''}"
+            style="width:90px;background:var(--surface);border:1px solid var(--border);
+              border-radius:6px;color:var(--text);font-size:12px;padding:5px 8px"
+            id="repair-entry-${t.id}">
+          <input type="number" placeholder="Exit ₹" step="0.05"
+            value="${t.exit||''}"
+            style="width:90px;background:var(--surface);border:1px solid var(--border);
+              border-radius:6px;color:var(--text);font-size:12px;padding:5px 8px"
+            id="repair-exit-${t.id}">
+          <button onclick="applyRepair(${t.id})"
+            style="background:var(--accent);color:#000;border:none;border-radius:6px;
+              font-size:11px;font-weight:700;padding:5px 12px;cursor:pointer">✓ Save</button>
+          <button onclick="deleteTrade(${t.id})"
+            style="background:rgba(255,77,109,0.1);color:var(--red);border:1px solid rgba(255,77,109,0.2);
+              border-radius:6px;font-size:11px;padding:5px 10px;cursor:pointer">✕</button>
+        </div>
+      </div>`).join('');
+
+    return `<div style="margin-bottom:20px">
+      <div style="font-size:12px;font-weight:700;color:var(--warn);letter-spacing:0.5px;
+        margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)">
+        📅 ${key} · ${g.buys.length} BUY · ${g.sells.length} SELL incomplete
+      </div>
+      ${buyRows}${sellRows}
+    </div>`;
+  }).join('');
+
+  panel.style.display = 'block';
+  panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function applyRepair(id) {
+  const t = trades.find(x => x.id === id);
+  if (!t) return;
+  const entryEl = document.getElementById(`repair-entry-${id}`);
+  const exitEl  = document.getElementById(`repair-exit-${id}`);
+  const newEntry = entryEl?.value.trim();
+  const newExit  = exitEl?.value.trim();
+  if (newEntry) t.entry = newEntry;
+  if (newExit)  { t.exit = newExit; t.exitReason = t.exitReason === 'Still Open' ? 'Manual Exit (Profit)' : t.exitReason; }
+  saveTrades();
+  updateHeaderPnL();
+  showRepairPanel(); // refresh
+  renderTrades();
+  renderLogStats();
+  showToast('✅ Trade updated');
+}
+
+function deleteTrade(id) {
+  if (!confirm('Delete this trade?')) return;
+  trades = trades.filter(t => t.id !== id);
+  saveTrades();
+  updateHeaderPnL();
+  showRepairPanel();
+  renderTrades();
+  renderLogStats();
+  showToast('Trade deleted');
+}
+
+function autoRepairAll() {
+  // Try to auto-pair remaining incomplete trades using matchTradePairs logic
+  const incomplete = trades.filter(t => !t.exit || !t.entry);
+  const complete   = trades.filter(t => t.exit && t.entry);
+  const paired     = matchTradePairs(incomplete);
+  const stillOpen  = paired.filter(t => !t.exit || !t.entry);
+  const newlyPaired = paired.filter(t => t.exit && t.entry && t._matched);
+  trades = [...complete, ...paired];
+  saveTrades();
+  updateHeaderPnL();
+  renderTrades();
+  renderLogStats();
+  showRepairPanel();
+  showToast(`✅ ${newlyPaired.length} pair(s) matched · ${stillOpen.length} still need manual entry`);
+}
+
 // ─────────────────────────────────────────
 // AUTO-MATCH BUY/SELL PAIRS INTO ROUND TRIPS
 // ─────────────────────────────────────────
@@ -2896,15 +3098,17 @@ function cancelMerge() {
   const bar = document.getElementById('merge-bar');
   if (bar) bar.style.display = 'none';
 }
-let importFile = null;
+let importFiles = [];
 let pendingImportTrades = [];
 
 function togglePan() {
   const inp = document.getElementById('imp-pan');
-  inp.type = inp.type === 'password' ? 'text' : 'password';
+  if (inp) inp.type = inp.type === 'password' ? 'text' : 'password';
 }
 
-// Drag-and-drop
+// ─────────────────────────────────────────
+// MULTI-FILE BATCH IMPORT ENGINE
+// ─────────────────────────────────────────
 function dzDragOver(e) {
   e.preventDefault();
   document.getElementById('imp-dropzone').classList.add('drag-over');
@@ -2913,174 +3117,244 @@ function dzDragLeave() {
   document.getElementById('imp-dropzone').classList.remove('drag-over');
 }
 function dzDrop(e) {
-  e.preventDefault();
-  dzDragLeave();
-  const file = e.dataTransfer.files[0];
-  if (file) setImportFile(file);
+  e.preventDefault(); dzDragLeave();
+  const files = [...e.dataTransfer.files].filter(f => f.name.toLowerCase().endsWith('.pdf'));
+  if (files.length) addFilesToQueue(files);
+  else showToast('Please drop PDF files only', 'error');
 }
 function dzFileChosen(e) {
-  const file = e.target.files[0];
-  if (file) setImportFile(file);
+  const files = [...e.target.files].filter(f => f.name.toLowerCase().endsWith('.pdf'));
+  if (files.length) addFilesToQueue(files);
+  e.target.value = '';
 }
 
-function setImportFile(file) {
-  if (!file.name.toLowerCase().endsWith('.pdf')) {
-    showToast('Please upload a PDF file', 'error'); return;
+function addFilesToQueue(newFiles) {
+  newFiles.forEach(f => {
+    if (!importFiles.find(x => x.name === f.name)) importFiles.push(f);
+  });
+  if (importFiles.length > 10) { importFiles = importFiles.slice(0,10); showToast('Max 10 files at once'); }
+  renderFileQueue();
+}
+
+function renderFileQueue() {
+  const queue = document.getElementById('imp-file-queue');
+  const list  = document.getElementById('imp-file-list');
+  const count = document.getElementById('queue-count');
+  const btn   = document.getElementById('imp-extract-btn');
+  const label = document.getElementById('imp-extract-label');
+  const dz    = document.getElementById('imp-dropzone');
+  if (!queue) return;
+
+  if (!importFiles.length) {
+    queue.style.display = 'none';
+    if (dz) dz.style.display = 'block';
+    if (btn) btn.disabled = true;
+    if (label) label.textContent = 'Extract Trades with AI';
+    return;
   }
-  importFile = file;
-  document.getElementById('imp-file-name').textContent = file.name;
-  document.getElementById('imp-file-size').textContent = (file.size / 1024).toFixed(1) + ' KB';
-  document.getElementById('imp-file-chosen').style.display = 'flex';
-  document.getElementById('imp-dropzone').style.display = 'none';
-  document.getElementById('imp-extract-btn').disabled = false;
+  if (dz) dz.style.display = 'none';
+  queue.style.display = 'block';
+  if (count) count.textContent = importFiles.length;
+  if (btn) btn.disabled = false;
+  if (label) label.textContent = `Extract All ${importFiles.length} PDF(s) with AI`;
+
+  if (list) list.innerHTML = importFiles.map((f, i) => {
+    const date = extractDateFromFilename(f.name) || '—';
+    return `<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;
+      background:var(--surface);border:1px solid var(--border);border-radius:8px;margin-bottom:6px"
+      id="file-row-${i}">
+      <div style="font-size:20px">📄</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${f.name}</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:2px">${(f.size/1024).toFixed(1)} KB · Date: ${date}</div>
+      </div>
+      <div id="file-status-${i}" style="font-size:11px;color:var(--text3);flex-shrink:0;min-width:70px;text-align:right">Queued</div>
+      <button onclick="removeFileFromQueue(${i})" style="background:none;border:none;color:var(--text3);
+        cursor:pointer;font-size:16px;padding:2px 6px;border-radius:4px"
+        onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--text3)'">✕</button>
+    </div>`;
+  }).join('');
 }
 
-function removeFile() {
-  importFile = null;
-  document.getElementById('imp-file-chosen').style.display = 'none';
-  document.getElementById('imp-dropzone').style.display = 'block';
-  document.getElementById('imp-extract-btn').disabled = true;
-  document.getElementById('imp-file').value = '';
-}
+function removeFileFromQueue(i) { importFiles.splice(i,1); renderFileQueue(); }
+function clearFileQueue() { importFiles = []; renderFileQueue(); }
+function removeFile() { clearFileQueue(); }
+function setImportFile(f) { addFilesToQueue([f]); }
 
-// ── Extract ──
-async function startExtraction() {
-  if (!importFile) { showToast('Please upload a PDF first', 'error'); return; }
-  if (!checkApiKey(() => startExtraction())) return;
+// ── Batch extraction ──
+async function startBatchExtraction() {
+  if (!importFiles.length) { showToast('Please add PDF files first', 'error'); return; }
+  if (!checkApiKey(() => startBatchExtraction())) return;
 
-  // Advance to step 2
-  setStep(2);
-  document.getElementById('imp-panel-1').style.display = 'none';
-  document.getElementById('imp-panel-2').style.display = 'block';
+  const btn = document.getElementById('imp-extract-btn');
+  if (btn) btn.disabled = true;
 
-  // Animate processing steps
-  const steps = [1,2,3,4,5];
-  const emojis = ['🔍','📊','⚡','🔗','✨'];
-  let stepIdx = 0;
-  const stepInterval = setInterval(() => {
-    if (stepIdx > 0) {
-      document.getElementById(`pstep-${stepIdx}`).classList.remove('active');
-      document.getElementById(`pstep-${stepIdx}`).classList.add('done');
-    }
-    stepIdx++;
-    if (stepIdx <= 5) {
-      document.getElementById(`pstep-${stepIdx}`).classList.add('active');
-      document.getElementById('imp-proc-emoji').textContent = emojis[stepIdx-1];
-    } else {
-      clearInterval(stepInterval);
-    }
-  }, 900);
+  const batchProg = document.getElementById('imp-batch-progress');
+  if (batchProg) batchProg.style.display = 'block';
+  const btotal = document.getElementById('batch-total');
+  if (btotal) btotal.textContent = importFiles.length;
 
-  try {
-    // Read PDF as base64
-    const base64 = await fileToBase64(importFile);
-    const tradeDate = extractDateFromFilename(importFile.name);
+  const allExtracted = [];
+  let totalFailed = 0;
 
-    // Call Claude API with PDF
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': getApiKey(),
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
-        messages: [{
-          role: 'user',
-          content: [
-            {
-              type: 'document',
-              source: { type: 'base64', media_type: 'application/pdf', data: base64 }
-            },
-            {
-              type: 'text',
-              text: `This is a Zerodha contract note PDF for account QN9226 dated ${tradeDate || 'unknown'}.
+  for (let i = 0; i < importFiles.length; i++) {
+    const file = importFiles[i];
+    const bcurrent = document.getElementById('batch-current');
+    if (bcurrent) bcurrent.textContent = i + 1;
+    const bbar = document.getElementById('batch-progress-bar');
+    if (bbar) bbar.style.width = `${Math.round((i / importFiles.length) * 100)}%`;
 
-Extract ALL F&O (futures & options) trades from this document.
+    updateFileStatus(i, '⏳ Reading…', 'var(--accent2)');
+    updateBatchLog(i, file.name, 'processing');
 
-For each trade, identify:
-- instrument: one of NIFTY, BANKNIFTY, SENSEX, FINNIFTY, MIDCPNIFTY (parse from symbol like NIFTY2560524500CE)
-- optType: "CE (Call)", "PE (Put)", or "FUT (Future)"
-- strike: the strike price as a string (e.g. "24500")
-- expiry: expiry date in YYYY-MM-DD format (parse from symbol)
-- direction: "BUY" or "SELL"
-- lots: number of lots (qty ÷ lot size: NIFTY=25, BANKNIFTY=15, SENSEX=10, FINNIFTY=40, MIDCPNIFTY=75)
-- entry: trade price as string
-- exit: exit price if this is a closing trade, else ""
-- time: trade time as HH:MM (24hr)
-- session: one of "Opening (9:15–10:00)", "Mid-Morning (10:00–12:00)", "Post-Lunch (12:00–14:00)", "Closing (14:00–15:30)"
-- exitReason: "Still Open" if no exit, else "Target Hit" / "Stop Loss Hit" / "Manual Exit (Profit)" / "Manual Exit (Loss)"
-- grossPnL: gross P&L for this trade in INR (positive=profit, negative=loss), or null if open
-
-Match BUY and SELL on the same symbol as entry+exit of the same round-trip trade where possible.
-
-Return ONLY a JSON array with no markdown, no explanation:
-[{"instrument":"NIFTY","optType":"CE (Call)","strike":"24500","expiry":"2026-06-05","direction":"BUY","lots":"2","entry":"120.50","exit":"185.00","time":"09:45","session":"Opening (9:15–10:00)","exitReason":"Manual Exit (Profit)","grossPnL":3225}]
-
-If no F&O trades found, return: []`
-            }
-          ]
-        }]
-      })
-    });
-
-    clearInterval(stepInterval);
-    for (let i = 1; i <= 5; i++) {
-      document.getElementById(`pstep-${i}`)?.classList.add('done');
-      document.getElementById(`pstep-${i}`)?.classList.remove('active');
-    }
-
-    if (!response.ok) {
-      const errData = await response.json().catch(() => ({}));
-      const errMsg = errData?.error?.message || response.statusText || 'Unknown error';
-      throw new Error(`API error ${response.status}: ${errMsg}`);
-    }
-
-    const data = await response.json();
-    if (data.error) throw new Error(data.error.message);
-
-    const text = data.content?.filter(b => b.type === 'text').map(b => b.text).join('') || '';
-
-    let parsed = [];
     try {
-      const cleaned = text.replace(/```json|```/g, '').trim();
-      parsed = JSON.parse(cleaned);
-    } catch {
-      const match = text.match(/\[[\s\S]*?\]/);
-      if (match) { try { parsed = JSON.parse(match[0]); } catch {} }
+      const base64    = await fileToBase64(file);
+      const tradeDate = extractDateFromFilename(file.name);
+      updateFileStatus(i, '🤖 AI reading…', 'var(--accent)');
+
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': getApiKey(),
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true'
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 4000,
+          messages: [{
+            role: 'user',
+            content: [
+              { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 }, cache_control: { type: 'ephemeral' } },
+              { type: 'text', text: `Zerodha contract note PDF for QN9226 dated ${tradeDate || 'unknown'}.
+
+IMPORTANT: Read ALL pages. Page 1 is a summary — trades are on pages 2, 3, 4+. Do NOT stop at page 1.
+
+Find the trade table (columns: Symbol, B/S, Qty, Trade Price, Order Time). Extract EVERY order row.
+
+For each row return:
+- instrument: NIFTY/BANKNIFTY/SENSEX/FINNIFTY/MIDCPNIFTY (from symbol)
+- optType: "CE (Call)" / "PE (Put)" / "FUT (Future)"
+- strike: numeric strike as string (e.g. "24500")
+- expiry: YYYY-MM-DD from symbol
+- direction: "BUY" or "SELL"
+- lots: qty ÷ lot size (NIFTY=25,BANKNIFTY=15,SENSEX=10,FINNIFTY=40,MIDCPNIFTY=75) rounded
+- entry: execution price
+- exit: ""
+- time: HH:MM (24hr)
+- session: "Opening (9:15–10:00)"/"Mid-Morning (10:00–12:00)"/"Post-Lunch (12:00–14:00)"/"Closing (14:00–15:30)"
+- exitReason: "Still Open"
+- grossPnL: null
+
+Each order = separate array entry. No BUY/SELL merging.
+Return ONLY valid JSON array, no markdown:
+[{"instrument":"NIFTY","optType":"PE (Put)","strike":"23350","expiry":"2026-06-05","direction":"BUY","lots":"3","entry":"164.75","exit":"","time":"09:47","session":"Opening (9:15–10:00)","exitReason":"Still Open","grossPnL":null}]
+If no trade table found return: []` }
+            ]
+          }]
+        })
+      });
+
+      if (!response.ok) { const e = await response.json().catch(()=>({})); throw new Error(e?.error?.message||`HTTP ${response.status}`); }
+      const data = await response.json();
+      if (data.error) throw new Error(data.error.message);
+
+      const text = data.content?.filter(b=>b.type==='text').map(b=>b.text).join('')||'';
+      let parsed = [];
+      try { parsed = JSON.parse(text.replace(/```json|```/g,'').trim()); }
+      catch { const m = text.match(/\[[\s\S]*\]/); if(m) try { parsed=JSON.parse(m[0]); } catch {} }
+
+      parsed = (Array.isArray(parsed)?parsed:[]).filter(t =>
+        t && t.instrument && t.direction && t.entry &&
+        ['NIFTY','BANKNIFTY','SENSEX','FINNIFTY','MIDCPNIFTY'].includes(t.instrument)
+      );
+
+      const date   = tradeDate || new Date().toISOString().split('T')[0];
+      const tagged = parsed.map(t => ({...t, date: t.date||date, tags:'zerodha-import'}));
+      const paired = matchTradePairs(tagged);
+      allExtracted.push(...paired);
+      updateFileStatus(i, `✅ ${parsed.length} orders`, 'var(--green)');
+      updateBatchLog(i, file.name, 'done', parsed.length);
+
+    } catch(err) {
+      totalFailed++;
+      updateFileStatus(i, '❌ Failed', 'var(--red)');
+      updateBatchLog(i, file.name, 'error', 0, err.message);
     }
 
-    if (!Array.isArray(parsed) || parsed.length === 0) {
-      showImportError('No F&O trades found in this PDF. Try the FREE Paste method instead — open PDF in Edge, press Ctrl+A → Ctrl+C, then switch to "Paste Contract Text" tab.');
-      return;
-    }
-
-    const date = tradeDate || new Date().toISOString().split('T')[0];
-    const tagged = parsed.map(t => ({ ...t, date: t.date || date, tags: 'zerodha-import' }));
-    // Auto-match BUY/SELL pairs before preview
-    pendingImportTrades = matchTradePairs(tagged);
-
-    await new Promise(r => setTimeout(r, 600));
-    showPreviewPanel(pendingImportTrades);
-
-  } catch (err) {
-    clearInterval(stepInterval);
-    let friendly = err.message || 'Unknown error';
-    if (friendly.includes('400')) {
-      friendly = 'PDF could not be read (Error 400). The file may have rendering issues. Please try the FREE Paste method — open PDF in Edge → Ctrl+A → Ctrl+C → switch to Paste tab.';
-    } else if (friendly.includes('401')) {
-      friendly = 'Invalid API key. Click 🔑 API Key (bottom-left) and re-enter your key.';
-      localStorage.removeItem('fno_api_key');
-    } else if (friendly.includes('429')) {
-      friendly = 'Too many requests. Please wait 30 seconds and try again.';
-    } else if (friendly.includes('fetch')) {
-      friendly = 'Network error. Check your internet connection and try again.';
-    }
-    showImportError(friendly);
+    if (i < importFiles.length - 1) await new Promise(r => setTimeout(r, 800));
   }
+
+  if (batchProg) { const bbar = document.getElementById('batch-progress-bar'); if(bbar) bbar.style.width='100%'; }
+
+  // Bulk save with full dedup
+  let totalImported = 0, totalSkipped = 0;
+  if (allExtracted.length) {
+    const now = Date.now();
+    const newTrades = allExtracted.map((t,i) => ({
+      id: now+i, date:t.date||'', time:t.time||'',
+      instrument:t.instrument||'', expiry:t.expiry||'',
+      optType:t.optType||'', strike:t.strike||'',
+      direction:t.direction||'', lots:t.lots||'1',
+      entry:t.entry||'', exit:t.exit||'',
+      sl:'', target:'', spot:'', vix:'', pcr:'',
+      trend:'', session:t.session||'', setup:'', bias:'', confidence:'',
+      emotion:'', exitReason:t.exitReason||(t.exit?'Manual Exit (Profit)':'Still Open'),
+      rules:'', mistake:'',
+      analysis:`Auto-imported from Zerodha contract note (${t.date})`,
+      notes:'', tags:t.tags||'zerodha-import', importedFrom:'zerodha-pdf'
+    }));
+    trades.unshift(...newTrades);
+    const seen = new Set();
+    const before = trades.length;
+    trades = trades.filter(t => {
+      const key = `${t.date}|${t.instrument}|${t.strike}|${t.optType}|${t.direction}|${t.entry}`;
+      if (seen.has(key)) return false;
+      seen.add(key); return true;
+    });
+    totalSkipped  = before - trades.length;
+    totalImported = newTrades.length - totalSkipped;
+    saveTrades(); updateHeaderPnL();
+  }
+
+  setTimeout(() => {
+    if (batchProg) batchProg.style.display = 'none';
+    document.getElementById('imp-panel-success').style.display = 'block';
+    setStep(3);
+    document.getElementById('imp-success-msg').innerHTML =
+      `<b>${allExtracted.length}</b> order(s) extracted from <b>${importFiles.length - totalFailed}</b> file(s).<br>
+       <b>${totalImported}</b> new trades added · <b>${totalSkipped}</b> duplicates removed · <b>${totalFailed}</b> failed.<br>
+       Go to <b>Trade Log → 🔧 Fix Missing Data</b> to pair any remaining BUY/SELL legs.`;
+    importFiles = []; renderFileQueue();
+    if (btn) btn.disabled = false;
+  }, 700);
+}
+
+// kept for legacy calls
+async function startExtraction() { await startBatchExtraction(); }
+
+function updateFileStatus(i, msg, color) {
+  const el = document.getElementById(`file-status-${i}`);
+  if (el) { el.textContent = msg; el.style.color = color; }
+}
+function updateBatchLog(i, name, status, count=0, err='') {
+  let el = document.getElementById(`blog-${i}`);
+  const container = document.getElementById('batch-file-statuses');
+  if (!el && container) {
+    el = document.createElement('div');
+    el.id = `blog-${i}`;
+    el.style.cssText = 'font-size:12px;color:var(--text2);padding:3px 0;display:flex;gap:8px;align-items:center';
+    container.appendChild(el);
+  }
+  if (!el) return;
+  const icons={processing:'⏳',done:'✅',error:'❌'};
+  const colors={processing:'var(--accent2)',done:'var(--green)',error:'var(--red)'};
+  el.innerHTML = `<span style="color:${colors[status]}">${icons[status]}</span>
+    <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name}</span>
+    <span style="color:${colors[status]};flex-shrink:0">
+      ${status==='done'?count+' orders':status==='error'?err.substring(0,40):'processing…'}
+    </span>`;
 }
 
 function fileToBase64(file) {
@@ -3203,6 +3477,17 @@ function confirmImport() {
   }
 
   trades.unshift(...newTrades);
+
+  // ── Auto-dedup entire journal ──
+  // Remove any duplicate trades (same date+instrument+strike+optType+direction+entry)
+  const seen = new Set();
+  trades = trades.filter(t => {
+    const key = `${t.date}|${t.instrument}|${t.strike}|${t.optType}|${t.direction}|${t.entry}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
   saveTrades();
   updateHeaderPnL();
 
@@ -3229,21 +3514,24 @@ function showImportError(msg) {
 }
 
 function resetImport() {
-  importFile = null;
+  importFiles = [];
   pendingImportTrades = [];
-  document.getElementById('imp-panel-2').style.display = 'none';
-  document.getElementById('imp-panel-3').style.display = 'none';
-  document.getElementById('imp-panel-success').style.display = 'none';
+  renderFileQueue();
+  ['imp-panel-2','imp-panel-3','imp-panel-success'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+  });
   document.getElementById('imp-panel-1').style.display = 'block';
-  document.getElementById('imp-file-chosen').style.display = 'none';
-  document.getElementById('imp-dropzone').style.display = 'block';
-  document.getElementById('imp-extract-btn').disabled = true;
-  document.getElementById('imp-file').value = '';
+  const batchProg = document.getElementById('imp-batch-progress');
+  if (batchProg) { batchProg.style.display = 'none'; }
+  const bfStatuses = document.getElementById('batch-file-statuses');
+  if (bfStatuses) bfStatuses.innerHTML = '';
+  const bbar = document.getElementById('batch-progress-bar');
+  if (bbar) bbar.style.width = '0%';
   const hint = document.getElementById('imp-pdf-hint');
   if (hint) hint.style.display = 'none';
-  // Reset step dots
-  for (let i = 1; i <= 5; i++) {
-    document.getElementById(`pstep-${i}`)?.classList.remove('active', 'done');
+  for (let i=1;i<=5;i++) {
+    document.getElementById(`pstep-${i}`)?.classList.remove('active','done');
   }
   setStep(1);
 }
