@@ -1454,6 +1454,16 @@ The parser will extract all F&O trades automatically."
 
   <div class="stats-grid" id="log-stats"></div>
 
+  <!-- Merge bar — shown when trades selected -->
+  <div id="merge-bar" style="display:none;align-items:center;gap:12px;flex-wrap:wrap;
+    background:rgba(0,149,255,0.08);border:1px solid rgba(0,149,255,0.25);
+    border-radius:10px;padding:12px 18px;margin-bottom:16px">
+    <span style="font-size:13px;color:var(--accent2)">🔗 <b id="merge-count">0</b> trade(s) selected for merge</span>
+    <button class="btn btn-primary" style="padding:7px 18px;font-size:13px;background:var(--accent2);color:#fff" onclick="doMerge()">⚡ Merge into Round Trip</button>
+    <button class="btn btn-ghost" style="padding:7px 14px;font-size:13px" onclick="cancelMerge()">✕ Cancel</button>
+    <span style="font-size:11px;color:var(--text3)">Select 1 BUY + 1 SELL of same instrument to combine</span>
+  </div>
+
   <div class="card">
     <div class="filter-bar">
       <input type="text" id="search-q" placeholder="🔍 Search instrument, tag, notes…" oninput="renderTrades()">
@@ -1479,6 +1489,7 @@ The parser will extract all F&O trades automatically."
       <table id="trades-table">
         <thead>
           <tr>
+            <th title="Select to merge">🔗</th>
             <th>Date</th><th>Instrument</th><th>Type</th><th>Dir</th>
             <th>Strike</th><th>Entry</th><th>Exit</th><th>Lots</th>
             <th>Gross P&L</th><th>Charges</th><th>Net P&L</th><th>Outcome</th><th>Setup</th><th>Actions</th>
@@ -1843,20 +1854,45 @@ function renderTrades() {
     const entry   = parseFloat(t.entry);
     const exit    = parseFloat(t.exit);
     const lots    = parseFloat(t.lots) || 1;
+    const isIncomplete = !t.exit || !t.entry;
+    const isSelected   = mergeSelection.includes(t.id);
+
     let chargesStr = '—', chargesVal = 0;
     if (gross !== null && !isNaN(entry) && !isNaN(exit)) {
       const ch = calcZerodhaCharges(t.instrument, t.optType, t.direction, entry, exit, lots);
       chargesVal = ch.total;
       chargesStr = '₹' + ch.total.toLocaleString('en-IN', {maximumFractionDigits:0});
     }
-    return `<tr>
+
+    const rowStyle = isSelected
+      ? 'background:rgba(0,149,255,0.08);outline:1px solid rgba(0,149,255,0.3)'
+      : isIncomplete
+        ? 'background:rgba(255,179,71,0.04)'
+        : '';
+
+    const entryCell = t.entry
+      ? `<td class="mono">₹${t.entry}</td>`
+      : `<td class="mono" style="color:var(--warn)" title="Entry price missing">⚠️ —</td>`;
+    const exitCell = t.exit
+      ? `<td class="mono">₹${t.exit}</td>`
+      : `<td class="mono" style="color:var(--text3)" title="No exit — trade still open or missing">
+           ${isIncomplete && t.entry ? '<span style="color:var(--warn);font-size:11px">⚠️ Missing</span>' : '—'}
+         </td>`;
+
+    return `<tr style="${rowStyle}">
+      <td>
+        <input type="checkbox" ${isSelected ? 'checked' : ''}
+          onchange="toggleMergeSelect(${t.id})"
+          style="cursor:pointer;accent-color:var(--accent2);width:14px;height:14px"
+          title="Select to merge">
+      </td>
       <td class="mono" style="font-size:12px">${t.date}</td>
       <td><b>${t.instrument || '—'}</b></td>
       <td style="font-size:12px">${t.optType || '—'}</td>
       <td><span class="badge ${t.direction === 'BUY' ? 'badge-buy' : 'badge-sell'}">${t.direction || '—'}</span></td>
       <td class="mono">${t.strike || '—'}</td>
-      <td class="mono">₹${t.entry || '—'}</td>
-      <td class="mono">${t.exit ? '₹' + t.exit : '—'}</td>
+      ${entryCell}
+      ${exitCell}
       <td class="mono">${t.lots || '1'}</td>
       <td class="mono ${pnlClass(gross)}">${fmtPnL(gross)}</td>
       <td class="mono" style="color:var(--warn);font-size:12px">${gross !== null ? '-' + chargesStr : '—'}</td>
@@ -1868,6 +1904,12 @@ function renderTrades() {
       </td>
     </tr>`;
   }).join('');
+
+  // Update merge bar count
+  const bar = document.getElementById('merge-bar');
+  const cnt = document.getElementById('merge-count');
+  if (bar) bar.style.display = mergeSelection.length > 0 ? 'flex' : 'none';
+  if (cnt) cnt.textContent = mergeSelection.length;
 }
 
 function renderLogStats() {
@@ -2614,8 +2656,8 @@ function startParsing() {
       showToast('No F&O trades found. Make sure you copied the full PDF text.', 'error');
       return;
     }
-    pendingImportTrades = parsed;
-    setTimeout(() => showPreviewPanel(parsed), 400);
+    pendingImportTrades = matchTradePairs(parsed);
+    setTimeout(() => showPreviewPanel(pendingImportTrades), 400);
   }, 1800);
 }
 
@@ -2724,8 +2766,136 @@ function parseZerodhaText(text) {
 }
 
 // ─────────────────────────────────────────
-// IMPORT PAGE — PDF UPLOAD + AI EXTRACTION
+// AUTO-MATCH BUY/SELL PAIRS INTO ROUND TRIPS
 // ─────────────────────────────────────────
+function matchTradePairs(list) {
+  // Group by instrument + strike + optType + date
+  const groups = {};
+  list.forEach(t => {
+    const key = `${t.date}|${t.instrument}|${t.strike}|${t.optType}`;
+    if (!groups[key]) groups[key] = [];
+    groups[key].push({ ...t });
+  });
+
+  const result = [];
+
+  Object.values(groups).forEach(group => {
+    const buys  = group.filter(t => t.direction === 'BUY'  && !t.exit);
+    const sells = group.filter(t => t.direction === 'SELL' && !t.exit);
+    const already = group.filter(t => t.exit); // already paired
+
+    // Add already-complete trades as-is
+    already.forEach(t => result.push(t));
+
+    // Try to pair each BUY with a SELL
+    const usedSells = new Set();
+    buys.forEach(buy => {
+      // Find best matching sell (same lots preferred)
+      const sellIdx = sells.findIndex((s, i) =>
+        !usedSells.has(i) && s.lots === buy.lots
+      );
+      const fallbackIdx = sells.findIndex((_, i) => !usedSells.has(i));
+      const matchIdx = sellIdx !== -1 ? sellIdx : fallbackIdx;
+
+      if (matchIdx !== -1) {
+        usedSells.add(matchIdx);
+        const sell = sells[matchIdx];
+        // Merge: BUY is entry, SELL is exit
+        result.push({
+          ...buy,
+          exit:       sell.entry,          // sell price becomes exit
+          exitTime:   sell.time,
+          exitReason: 'Manual Exit (Profit)',
+          lots:       buy.lots,
+          tags:       (buy.tags || '') + ', auto-matched',
+          _matched:   true
+        });
+      } else {
+        // No matching sell — keep as open BUY
+        result.push(buy);
+      }
+    });
+
+    // Any unmatched sells — keep as open SELL (short position)
+    sells.forEach((s, i) => {
+      if (!usedSells.has(i)) result.push(s);
+    });
+  });
+
+  return result;
+}
+
+// ─────────────────────────────────────────
+// MANUAL MERGE — merge two selected trades in Trade Log
+// ─────────────────────────────────────────
+let mergeSelection = [];
+
+function toggleMergeSelect(id) {
+  const idx = mergeSelection.indexOf(id);
+  if (idx === -1) {
+    if (mergeSelection.length >= 2) {
+      showToast('Select only 2 trades to merge', 'error'); return;
+    }
+    mergeSelection.push(id);
+  } else {
+    mergeSelection.splice(idx, 1);
+  }
+  renderTrades();
+  const bar = document.getElementById('merge-bar');
+  if (bar) bar.style.display = mergeSelection.length > 0 ? 'flex' : 'none';
+}
+
+function doMerge() {
+  if (mergeSelection.length !== 2) {
+    showToast('Please select exactly 2 trades to merge', 'error'); return;
+  }
+  const [id1, id2] = mergeSelection;
+  const t1 = trades.find(t => t.id === id1);
+  const t2 = trades.find(t => t.id === id2);
+  if (!t1 || !t2) return;
+
+  // Determine which is BUY (entry) and which is SELL (exit)
+  const buyTrade  = t1.direction === 'BUY'  ? t1 : t2;
+  const sellTrade = t1.direction === 'SELL' ? t1 : t2;
+
+  if (!buyTrade || !sellTrade || buyTrade.direction === sellTrade.direction) {
+    showToast('Select one BUY and one SELL trade to merge', 'error'); return;
+  }
+
+  // Validate same instrument + strike
+  if (buyTrade.instrument !== sellTrade.instrument || buyTrade.strike !== sellTrade.strike) {
+    if (!confirm(`Instruments don't match exactly (${buyTrade.instrument} ${buyTrade.strike} vs ${sellTrade.instrument} ${sellTrade.strike}). Merge anyway?`)) return;
+  }
+
+  // Create merged trade
+  const merged = {
+    ...buyTrade,
+    exit:       sellTrade.entry,
+    exitTime:   sellTrade.time,
+    exitReason: 'Manual Exit (Profit)',
+    notes:      (buyTrade.notes || '') + (buyTrade.notes ? '\n' : '') + 'Manually merged with SELL leg.',
+    tags:       ((buyTrade.tags || '') + ', merged').replace(/^, /, ''),
+  };
+
+  // Remove both originals, add merged
+  trades = trades.filter(t => t.id !== id1 && t.id !== id2);
+  trades.unshift(merged);
+  saveTrades();
+  updateHeaderPnL();
+  mergeSelection = [];
+  renderTrades();
+  renderLogStats();
+  const bar = document.getElementById('merge-bar');
+  if (bar) bar.style.display = 'none';
+  showToast('✅ Trades merged successfully!');
+}
+
+function cancelMerge() {
+  mergeSelection = [];
+  renderTrades();
+  const bar = document.getElementById('merge-bar');
+  if (bar) bar.style.display = 'none';
+}
 let importFile = null;
 let pendingImportTrades = [];
 
@@ -2889,7 +3059,9 @@ If no F&O trades found, return: []`
     }
 
     const date = tradeDate || new Date().toISOString().split('T')[0];
-    pendingImportTrades = parsed.map(t => ({ ...t, date: t.date || date, tags: 'zerodha-import' }));
+    const tagged = parsed.map(t => ({ ...t, date: t.date || date, tags: 'zerodha-import' }));
+    // Auto-match BUY/SELL pairs before preview
+    pendingImportTrades = matchTradePairs(tagged);
 
     await new Promise(r => setTimeout(r, 600));
     showPreviewPanel(pendingImportTrades);
