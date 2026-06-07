@@ -1481,7 +1481,7 @@ The parser will extract all F&O trades automatically."
           <tr>
             <th>Date</th><th>Instrument</th><th>Type</th><th>Dir</th>
             <th>Strike</th><th>Entry</th><th>Exit</th><th>Lots</th>
-            <th>P&L</th><th>Outcome</th><th>Setup</th><th>Actions</th>
+            <th>Gross P&L</th><th>Charges</th><th>Net P&L</th><th>Outcome</th><th>Setup</th><th>Actions</th>
           </tr>
         </thead>
         <tbody id="trades-tbody"></tbody>
@@ -1535,6 +1535,11 @@ The parser will extract all F&O trades automatically."
       <div class="card-title">Monthly P&L</div>
       <div class="chart-bar-wrap" id="bar-monthly"></div>
     </div>
+  </div>
+
+  <div class="card mt-4">
+    <div class="card-title">Daily P&L Breakdown (Net after charges)</div>
+    <div class="chart-bar-wrap" id="bar-daily"></div>
   </div>
 
   <div class="card mt-4">
@@ -1595,27 +1600,130 @@ function saveTrades() {
   localStorage.setItem('fno_trades', JSON.stringify(trades));
 }
 
-// Lot sizes
+// ─────────────────────────────────────────
+// LOT SIZES
+// ─────────────────────────────────────────
 const LOT_SIZES = { NIFTY: 25, BANKNIFTY: 15, SENSEX: 10, FINNIFTY: 40, MIDCPNIFTY: 75 };
-
 function getLotSize(inst) { return LOT_SIZES[inst] || 25; }
 
-function calcPnL(t) {
+// ─────────────────────────────────────────
+// ZERODHA CHARGES CALCULATOR (exact)
+// Matches Zerodha's official charge structure
+// ─────────────────────────────────────────
+function calcZerodhaCharges(instrument, optType, direction, entry, exit, lots) {
+  const ls      = getLotSize(instrument);
+  const qty     = lots * ls;
+  const isFut   = (optType || '').includes('FUT');
+  const isSell  = direction === 'SELL';
+  const isBuy   = direction === 'BUY';
+
+  // Turnover
+  const entryTurnover = entry * qty;
+  const exitTurnover  = exit  * qty;
+  const totalTurnover = entryTurnover + exitTurnover;
+
+  // ── Brokerage ──
+  // Zerodha: ₹20 per order or 0.03% whichever is lower (for F&O)
+  const brokeragePerOrder = Math.min(20, 0.0003 * entryTurnover);
+  const brokerageEntry    = Math.min(20, 0.0003 * entryTurnover);
+  const brokerageExit     = Math.min(20, 0.0003 * exitTurnover);
+  const totalBrokerage    = brokerageEntry + brokerageExit;
+
+  // ── STT (Securities Transaction Tax) ──
+  // Options: 0.1% on SELL side premium only (on exit if BUY trade, on entry if SELL trade)
+  // Futures: 0.02% on sell side
+  let stt = 0;
+  if (isFut) {
+    // 0.02% on sell turnover
+    const sellTurnover = isSell ? entryTurnover : exitTurnover;
+    stt = sellTurnover * 0.0002;
+  } else {
+    // Options: 0.1% on sell premium turnover
+    const sellPremiumTurnover = isSell ? entryTurnover : exitTurnover;
+    stt = sellPremiumTurnover * 0.001;
+  }
+
+  // ── Exchange Transaction Charges ──
+  // NSE F&O: 0.053% on turnover (both legs)
+  // BSE (SENSEX/BANKEX): 0.05% 
+  const exchRate   = instrument === 'SENSEX' ? 0.0005 : 0.00053;
+  const exchCharges = totalTurnover * exchRate;
+
+  // ── SEBI Charges ──
+  // ₹10 per crore of turnover = 0.000001 on turnover
+  const sebiCharges = totalTurnover * 0.000001;
+
+  // ── GST ──
+  // 18% on (brokerage + exchange charges + SEBI charges)
+  const gst = (totalBrokerage + exchCharges + sebiCharges) * 0.18;
+
+  // ── Stamp Duty ──
+  // 0.003% on BUY side only (entry if BUY, exit if SELL)
+  const buyTurnover  = isBuy ? entryTurnover : exitTurnover;
+  const stampDuty    = isFut ? buyTurnover * 0.00002 : buyTurnover * 0.00003;
+
+  // ── Total charges ──
+  const totalCharges = totalBrokerage + stt + exchCharges + sebiCharges + gst + stampDuty;
+
+  return {
+    brokerage:    Math.round(totalBrokerage * 100) / 100,
+    stt:          Math.round(stt * 100) / 100,
+    exchCharges:  Math.round(exchCharges * 100) / 100,
+    sebiCharges:  Math.round(sebiCharges * 100) / 100,
+    gst:          Math.round(gst * 100) / 100,
+    stampDuty:    Math.round(stampDuty * 100) / 100,
+    total:        Math.round(totalCharges * 100) / 100
+  };
+}
+
+// ─────────────────────────────────────────
+// GROSS P&L (before charges)
+// ─────────────────────────────────────────
+function calcGrossPnL(t) {
   if (!t.exit || t.exitReason === 'Still Open') return null;
-  const ls = getLotSize(t.instrument);
+  const ls   = getLotSize(t.instrument);
   const lots = parseFloat(t.lots) || 1;
   const entry = parseFloat(t.entry);
-  const exit = parseFloat(t.exit);
+  const exit  = parseFloat(t.exit);
+  if (isNaN(entry) || isNaN(exit)) return null;
   let pnl = (exit - entry) * ls * lots;
   if (t.direction === 'SELL') pnl = -pnl;
   return Math.round(pnl * 100) / 100;
 }
 
+// ─────────────────────────────────────────
+// NET P&L (after all Zerodha charges)
+// This is what actually matches your account
+// ─────────────────────────────────────────
+function calcNetPnL(t) {
+  const gross = calcGrossPnL(t);
+  if (gross === null) return null;
+  const entry  = parseFloat(t.entry);
+  const exit   = parseFloat(t.exit);
+  const lots   = parseFloat(t.lots) || 1;
+  if (isNaN(entry) || isNaN(exit)) return gross;
+  const charges = calcZerodhaCharges(t.instrument, t.optType, t.direction, entry, exit, lots);
+  return Math.round((gross - charges.total) * 100) / 100;
+}
+
+// Main P&L function — NET (matches Zerodha)
+function calcPnL(t) { return calcNetPnL(t); }
+
 function getOutcome(pnl) {
   if (pnl === null) return 'OPEN';
-  if (pnl > 0) return 'WIN';
-  if (pnl < 0) return 'LOSS';
-  return 'BREAKEVEN';
+  if (pnl > 50)  return 'WIN';       // >₹50 is a win
+  if (pnl < -50) return 'LOSS';      // <-₹50 is a loss
+  if (pnl >= 0)  return 'WIN';
+  return 'LOSS';
+}
+
+function fmtPnL(pnl) {
+  if (pnl === null) return '—';
+  return (pnl >= 0 ? '+' : '') + '₹' + Math.abs(pnl).toLocaleString('en-IN', {maximumFractionDigits:0});
+}
+function pnlClass(pnl) {
+  if (pnl === null) return '';
+  return pnl > 0 ? 'pos' : pnl < 0 ? 'neg' : 'neutral';
 }
 
 // ─────────────────────────────────────────
@@ -1729,10 +1837,18 @@ function renderTrades() {
   }
   empty.style.display = 'none';
   tbody.innerHTML = list.map(t => {
-    const pnl = calcPnL(t);
-    const outcome = getOutcome(pnl);
-    const pnlStr = pnl === null ? '—' : (pnl >= 0 ? '+' : '') + '₹' + pnl.toLocaleString('en-IN');
-    const pnlClass = pnl === null ? '' : pnl > 0 ? 'pos' : pnl < 0 ? 'neg' : 'neutral';
+    const gross   = calcGrossPnL(t);
+    const net     = calcNetPnL(t);
+    const outcome = getOutcome(net);
+    const entry   = parseFloat(t.entry);
+    const exit    = parseFloat(t.exit);
+    const lots    = parseFloat(t.lots) || 1;
+    let chargesStr = '—', chargesVal = 0;
+    if (gross !== null && !isNaN(entry) && !isNaN(exit)) {
+      const ch = calcZerodhaCharges(t.instrument, t.optType, t.direction, entry, exit, lots);
+      chargesVal = ch.total;
+      chargesStr = '₹' + ch.total.toLocaleString('en-IN', {maximumFractionDigits:0});
+    }
     return `<tr>
       <td class="mono" style="font-size:12px">${t.date}</td>
       <td><b>${t.instrument || '—'}</b></td>
@@ -1742,7 +1858,9 @@ function renderTrades() {
       <td class="mono">₹${t.entry || '—'}</td>
       <td class="mono">${t.exit ? '₹' + t.exit : '—'}</td>
       <td class="mono">${t.lots || '1'}</td>
-      <td class="mono ${pnlClass}"><b>${pnlStr}</b></td>
+      <td class="mono ${pnlClass(gross)}">${fmtPnL(gross)}</td>
+      <td class="mono" style="color:var(--warn);font-size:12px">${gross !== null ? '-' + chargesStr : '—'}</td>
+      <td class="mono ${pnlClass(net)}"><b>${fmtPnL(net)}</b></td>
       <td><span class="badge badge-${outcome.toLowerCase()}">${outcome}</span></td>
       <td style="font-size:11px;color:var(--text2)">${t.setup || '—'}</td>
       <td>
@@ -1753,16 +1871,23 @@ function renderTrades() {
 }
 
 function renderLogStats() {
-  const list = trades;
-  const closed = list.filter(t => calcPnL(t) !== null);
-  const wins = closed.filter(t => calcPnL(t) > 0);
-  const totalPnL = closed.reduce((a, t) => a + calcPnL(t), 0);
-  const wr = closed.length ? Math.round(wins.length / closed.length * 100) : 0;
+  const list   = trades;
+  const closed = list.filter(t => calcNetPnL(t) !== null);
+  const grossTotal   = closed.reduce((a,t) => a + (calcGrossPnL(t)||0), 0);
+  const netTotal     = closed.reduce((a,t) => a + (calcNetPnL(t)||0), 0);
+  const totalCharges = grossTotal - netTotal;
+  const wins   = closed.filter(t => (calcNetPnL(t)||0) > 0);
+  const losses = closed.filter(t => (calcNetPnL(t)||0) < 0);
+  const wr     = closed.length ? Math.round(wins.length / closed.length * 100) : 0;
   document.getElementById('log-stats').innerHTML = `
     <div class="stat-card"><div class="stat-label">Total Trades</div><div class="stat-val">${list.length}</div></div>
-    <div class="stat-card"><div class="stat-label">Closed Trades</div><div class="stat-val">${closed.length}</div></div>
-    <div class="stat-card"><div class="stat-label">Win Rate</div><div class="stat-val ${wr >= 50 ? 'pos' : 'neg'}">${wr}%</div></div>
-    <div class="stat-card"><div class="stat-label">Net P&L</div><div class="stat-val ${totalPnL >= 0 ? 'pos' : 'neg'}">${totalPnL >= 0 ? '+' : ''}₹${Math.abs(totalPnL).toLocaleString('en-IN')}</div></div>
+    <div class="stat-card"><div class="stat-label">Closed</div><div class="stat-val">${closed.length}</div></div>
+    <div class="stat-card"><div class="stat-label">Win Rate</div><div class="stat-val ${wr>=50?'pos':'neg'}">${wr}%</div></div>
+    <div class="stat-card"><div class="stat-label">Gross P&L</div><div class="stat-val ${grossTotal>=0?'pos':'neg'}">${fmtPnL(grossTotal)}</div><div class="stat-change">Before charges</div></div>
+    <div class="stat-card"><div class="stat-label">Total Charges</div><div class="stat-val neg">-₹${Math.abs(totalCharges).toLocaleString('en-IN',{maximumFractionDigits:0})}</div><div class="stat-change">Brokerage+STT+GST+etc</div></div>
+    <div class="stat-card" style="border-color:${netTotal>=0?'rgba(0,212,170,0.4)':'rgba(255,77,109,0.4)'}"><div class="stat-label">Net P&L</div><div class="stat-val ${netTotal>=0?'pos':'neg'}"><b>${fmtPnL(netTotal)}</b></div><div class="stat-change">Matches Zerodha</div></div>
+    <div class="stat-card"><div class="stat-label">Winning Days</div><div class="stat-val pos">${wins.length}</div></div>
+    <div class="stat-card"><div class="stat-label">Loss Days</div><div class="stat-val neg">${losses.length}</div></div>
   `;
 }
 
@@ -1791,25 +1916,59 @@ function showDetail(id) {
   const t = trades.find(x => x.id === id);
   if (!t) return;
   currentDetailId = id;
-  const pnl = calcPnL(t);
-  const pnlStr = pnl === null ? 'Open' : (pnl >= 0 ? '+' : '') + '₹' + pnl.toLocaleString('en-IN');
+  const gross = calcGrossPnL(t);
+  const net   = calcNetPnL(t);
+  const entry = parseFloat(t.entry), exit = parseFloat(t.exit), lots = parseFloat(t.lots)||1;
+  let chargesHTML = '';
+  if (gross !== null && !isNaN(entry) && !isNaN(exit)) {
+    const ch = calcZerodhaCharges(t.instrument, t.optType, t.direction, entry, exit, lots);
+    chargesHTML = `
+      <div style="grid-column:1/-1;background:var(--surface);border:1px solid var(--border);
+        border-radius:10px;padding:14px 16px;margin-top:4px">
+        <div class="card-title" style="margin-bottom:10px">P&L Breakdown (matches Zerodha)</div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px">
+          <div><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px">Gross P&L</div>
+               <div style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700;color:${(gross||0)>=0?'var(--green)':'var(--red)'}">${fmtPnL(gross)}</div></div>
+          <div><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px">Brokerage</div>
+               <div style="font-family:'JetBrains Mono',monospace;font-size:14px;color:var(--warn)">-₹${ch.brokerage.toFixed(2)}</div></div>
+          <div><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px">STT</div>
+               <div style="font-family:'JetBrains Mono',monospace;font-size:14px;color:var(--warn)">-₹${ch.stt.toFixed(2)}</div></div>
+          <div><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px">Exch Charges</div>
+               <div style="font-family:'JetBrains Mono',monospace;font-size:14px;color:var(--warn)">-₹${ch.exchCharges.toFixed(2)}</div></div>
+          <div><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px">GST (18%)</div>
+               <div style="font-family:'JetBrains Mono',monospace;font-size:14px;color:var(--warn)">-₹${ch.gst.toFixed(2)}</div></div>
+          <div><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px">SEBI</div>
+               <div style="font-family:'JetBrains Mono',monospace;font-size:14px;color:var(--warn)">-₹${ch.sebiCharges.toFixed(2)}</div></div>
+          <div><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px">Stamp Duty</div>
+               <div style="font-family:'JetBrains Mono',monospace;font-size:14px;color:var(--warn)">-₹${ch.stampDuty.toFixed(2)}</div></div>
+          <div><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px">Total Charges</div>
+               <div style="font-family:'JetBrains Mono',monospace;font-size:14px;color:var(--warn);font-weight:700">-₹${ch.total.toFixed(2)}</div></div>
+        </div>
+        <div style="border-top:1px solid var(--border);padding-top:10px;display:flex;align-items:center;justify-content:space-between">
+          <span style="font-size:13px;font-weight:700;color:var(--text2)">NET P&L (matches Zerodha account)</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:800;color:${(net||0)>=0?'var(--green)':'var(--red)'}">${fmtPnL(net)}</span>
+        </div>
+      </div>`;
+  }
+  const netStr = net === null ? 'Open' : fmtPnL(net);
   document.getElementById('modal-body').innerHTML = `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
       ${row2('Date', t.date)} ${row2('Time', t.time)}
       ${row2('Instrument', `<b>${t.instrument}</b>`)} ${row2('Type', t.optType)}
       ${row2('Direction', `<span class="badge badge-${t.direction?.toLowerCase()}">${t.direction}</span>`)} ${row2('Strike', t.strike)}
       ${row2('Entry', '₹' + t.entry)} ${row2('Exit', t.exit ? '₹' + t.exit : '—')}
-      ${row2('Lots', t.lots)} ${row2('P&L', `<b class="${pnl > 0 ? 'pos' : pnl < 0 ? 'neg' : ''}">${pnlStr}</b>`)}
-      ${row2('SL', t.sl ? '₹' + t.sl : '—')} ${row2('Target', t.target ? '₹' + t.target : '—')}
-      ${row2('NIFTY Spot', t.spot || '—')} ${row2('VIX', t.vix || '—')}
-      ${row2('PCR', t.pcr || '—')} ${row2('Trend', t.trend || '—')}
-      ${row2('Session', t.session || '—')} ${row2('Setup', t.setup || '—')}
-      ${row2('Emotion', t.emotion || '—')} ${row2('Rules', t.rules || '—')}
-      ${row2('Mistake', t.mistake || '—')} ${row2('Exit Reason', t.exitReason || '—')}
+      ${row2('Lots', t.lots)} ${row2('Net P&L', `<b class="${(net||0)>0?'pos':(net||0)<0?'neg':''}">${netStr}</b>`)}
+      ${row2('SL', t.sl ? '₹'+t.sl : '—')} ${row2('Target', t.target ? '₹'+t.target : '—')}
+      ${row2('NIFTY Spot', t.spot||'—')} ${row2('VIX', t.vix||'—')}
+      ${row2('PCR', t.pcr||'—')} ${row2('Trend', t.trend||'—')}
+      ${row2('Session', t.session||'—')} ${row2('Setup', t.setup||'—')}
+      ${row2('Emotion', t.emotion||'—')} ${row2('Rules', t.rules||'—')}
+      ${row2('Mistake', t.mistake||'—')} ${row2('Exit Reason', t.exitReason||'—')}
+      ${chargesHTML}
     </div>
     ${t.analysis ? `<div style="margin-bottom:10px"><div class="card-title">Analysis</div><div class="text-sm" style="line-height:1.7">${t.analysis}</div></div>` : ''}
     ${t.notes ? `<div style="margin-bottom:10px"><div class="card-title">Notes</div><div class="text-sm" style="line-height:1.7">${t.notes}</div></div>` : ''}
-    ${t.tags ? `<div><div class="card-title">Tags</div>${t.tags.split(',').map(x => `<span class="tag">${x.trim()}</span>`).join('')}</div>` : ''}
+    ${t.tags ? `<div><div class="card-title">Tags</div>${t.tags.split(',').map(x=>`<span class="tag">${x.trim()}</span>`).join('')}</div>` : ''}
   `;
   document.getElementById('modal-delete-btn').onclick = () => {
     if (confirm('Delete this trade?')) {
@@ -1828,48 +1987,91 @@ document.getElementById('detail-modal').addEventListener('click', e => { if (e.t
 // ANALYTICS
 // ─────────────────────────────────────────
 function renderAnalytics() {
-  const closed = trades.filter(t => calcPnL(t) !== null);
-  const pnls = closed.map(t => calcPnL(t));
-  const wins = pnls.filter(p => p > 0);
-  const losses = pnls.filter(p => p < 0);
-  const totalPnL = pnls.reduce((a,b) => a+b, 0);
-  const wr = closed.length ? wins.length / closed.length * 100 : 0;
-  const avgWin = wins.length ? wins.reduce((a,b)=>a+b,0)/wins.length : 0;
+  const closed = trades.filter(t => calcNetPnL(t) !== null);
+  const netPnLs   = closed.map(t => calcNetPnL(t));
+  const grossPnLs = closed.map(t => calcGrossPnL(t));
+  const wins   = netPnLs.filter(p => p > 0);
+  const losses = netPnLs.filter(p => p < 0);
+  const totalNet   = netPnLs.reduce((a,b)=>a+b, 0);
+  const totalGross = grossPnLs.reduce((a,b)=>a+b, 0);
+  const totalCharges = totalGross - totalNet;
+  const wr     = closed.length ? wins.length/closed.length*100 : 0;
+  const avgWin  = wins.length   ? wins.reduce((a,b)=>a+b,0)/wins.length : 0;
   const avgLoss = losses.length ? losses.reduce((a,b)=>a+b,0)/losses.length : 0;
-  const rr = avgLoss ? Math.abs(avgWin / avgLoss) : 0;
-  const maxDD = calcMaxDrawdown(closed);
-  const profitFactor = losses.length && wins.length ? wins.reduce((a,b)=>a+b,0) / Math.abs(losses.reduce((a,b)=>a+b,0)) : 0;
+  const rr      = avgLoss ? Math.abs(avgWin/avgLoss) : 0;
+  const maxDD   = calcMaxDrawdown(closed.map((_,i)=>netPnLs[i]));
+  const profitFactor = losses.length && wins.length
+    ? wins.reduce((a,b)=>a+b,0) / Math.abs(losses.reduce((a,b)=>a+b,0)) : 0;
 
   document.getElementById('analytics-stats').innerHTML = `
-    <div class="stat-card"><div class="stat-label">Net P&L</div><div class="stat-val ${totalPnL>=0?'pos':'neg'}">${totalPnL>=0?'+':''}₹${Math.abs(totalPnL).toLocaleString('en-IN')}</div></div>
+    <div class="stat-card"><div class="stat-label">Gross P&L</div><div class="stat-val ${totalGross>=0?'pos':'neg'}">${fmtPnL(totalGross)}</div><div class="stat-change">Before charges</div></div>
+    <div class="stat-card"><div class="stat-label">Total Charges</div><div class="stat-val neg">-₹${Math.abs(totalCharges).toLocaleString('en-IN',{maximumFractionDigits:0})}</div><div class="stat-change">Brokerage+STT+GST+etc</div></div>
+    <div class="stat-card" style="border-color:${totalNet>=0?'rgba(0,212,170,0.5)':'rgba(255,77,109,0.5)'}"><div class="stat-label">Net P&L</div><div class="stat-val ${totalNet>=0?'pos':'neg'}"><b>${fmtPnL(totalNet)}</b></div><div class="stat-change">= Zerodha account</div></div>
     <div class="stat-card"><div class="stat-label">Win Rate</div><div class="stat-val ${wr>=50?'pos':'neg'}">${wr.toFixed(1)}%</div></div>
-    <div class="stat-card"><div class="stat-label">Avg Win</div><div class="stat-val pos">₹${avgWin.toFixed(0)}</div></div>
-    <div class="stat-card"><div class="stat-label">Avg Loss</div><div class="stat-val neg">₹${Math.abs(avgLoss).toFixed(0)}</div></div>
+    <div class="stat-card"><div class="stat-label">Avg Win</div><div class="stat-val pos">${fmtPnL(avgWin)}</div></div>
+    <div class="stat-card"><div class="stat-label">Avg Loss</div><div class="stat-val neg">${fmtPnL(avgLoss)}</div></div>
     <div class="stat-card"><div class="stat-label">Risk:Reward</div><div class="stat-val ${rr>=1.5?'pos':'neg'}">${rr.toFixed(2)}</div></div>
     <div class="stat-card"><div class="stat-label">Profit Factor</div><div class="stat-val ${profitFactor>=1?'pos':'neg'}">${profitFactor.toFixed(2)}</div></div>
-    <div class="stat-card"><div class="stat-label">Max Drawdown</div><div class="stat-val neg">₹${Math.abs(maxDD).toLocaleString('en-IN')}</div></div>
+    <div class="stat-card"><div class="stat-label">Max Drawdown</div><div class="stat-val neg">${fmtPnL(maxDD)}</div></div>
     <div class="stat-card"><div class="stat-label">Total Trades</div><div class="stat-val">${closed.length}</div></div>
   `;
 
-  drawEquityCurve(closed);
-  drawDonut(wins.length, losses.length, pnls.filter(p=>p===0).length);
-  drawBarChart('bar-instrument', groupBy(closed, t => t.instrument, calcPnL));
-  drawBarChart('bar-session', groupBy(closed, t => (t.session||'Unknown').split(' ')[0], calcPnL));
-  drawBarChart('bar-setup', groupBy(closed, t => t.setup || 'Unknown', calcPnL));
+  drawEquityCurve(closed.map((_,i) => netPnLs[i]));
+  drawDonut(wins.length, losses.length, netPnLs.filter(p=>p===0).length);
+  drawBarChart('bar-instrument', groupBy(closed, t=>t.instrument, calcNetPnL));
+  drawBarChart('bar-session',    groupBy(closed, t=>(t.session||'Unknown').split(' ')[0], calcNetPnL));
+  drawBarChart('bar-setup',      groupBy(closed, t=>t.setup||'Unknown', calcNetPnL));
   drawMonthlyBar();
   drawCalendar();
-  drawBarChart('bar-emotion', groupBy(closed, t => (t.emotion || 'Unknown').split(' ')[0], calcPnL));
+  drawBarChart('bar-emotion',    groupBy(closed, t=>(t.emotion||'Unknown').split(' ')[0], calcNetPnL));
+  drawDailyPnLBar();
 }
 
-function calcMaxDrawdown(closed) {
+function calcMaxDrawdown(pnlArray) {
   let peak = 0, dd = 0, cum = 0;
-  closed.slice().reverse().forEach(t => {
-    cum += calcPnL(t);
+  pnlArray.slice().reverse().forEach(p => {
+    cum += p;
     if (cum > peak) peak = cum;
     const d = peak - cum;
     if (d > dd) dd = d;
   });
   return -dd;
+}
+
+function drawDailyPnLBar() {
+  const el = document.getElementById('bar-daily');
+  if (!el) return;
+  const closed = trades.filter(t => calcNetPnL(t) !== null);
+  const daily = {};
+  closed.forEach(t => {
+    const d = t.date || 'Unknown';
+    if (!daily[d]) daily[d] = { net: 0, gross: 0, charges: 0 };
+    daily[d].net    += calcNetPnL(t) || 0;
+    daily[d].gross  += calcGrossPnL(t) || 0;
+    const entry = parseFloat(t.entry), exit = parseFloat(t.exit), lots = parseFloat(t.lots)||1;
+    if (!isNaN(entry) && !isNaN(exit)) {
+      daily[d].charges += calcZerodhaCharges(t.instrument, t.optType, t.direction, entry, exit, lots).total;
+    }
+  });
+  const sorted = Object.keys(daily).sort();
+  if (!sorted.length) { el.innerHTML = '<div class="empty-state" style="padding:16px"><p>No data</p></div>'; return; }
+  const max = Math.max(...sorted.map(d => Math.abs(daily[d].net)));
+  el.innerHTML = sorted.map(d => {
+    const v = daily[d];
+    const pct = max ? Math.abs(v.net)/max*100 : 0;
+    const color = v.net >= 0 ? 'var(--green)' : 'var(--red)';
+    const label = d.substring(5); // MM-DD
+    return `<div class="chart-bar-row" style="margin-bottom:6px">
+      <div class="chart-bar-label" style="width:60px;font-size:11px">${label}</div>
+      <div style="flex:1">
+        <div class="chart-bar-track"><div class="chart-bar-fill" style="width:${pct}%;background:${color}"></div></div>
+        <div style="font-size:10px;color:var(--text3);margin-top:2px">
+          Gross ${fmtPnL(v.gross)} · Charges -₹${Math.abs(v.charges).toFixed(0)}
+        </div>
+      </div>
+      <div class="chart-bar-val" style="color:${color};width:80px">${fmtPnL(v.net)}</div>
+    </div>`;
+  }).join('');
 }
 
 function groupBy(list, keyFn, valFn) {
@@ -1900,12 +2102,12 @@ function drawBarChart(id, data) {
 }
 
 function drawMonthlyBar() {
-  const closed = trades.filter(t => calcPnL(t) !== null);
+  const closed = trades.filter(t => calcNetPnL(t) !== null);
   const monthly = {};
   closed.forEach(t => {
     const m = t.date?.substring(0,7) || 'Unknown';
     if (!monthly[m]) monthly[m] = 0;
-    monthly[m] += calcPnL(t);
+    monthly[m] += calcNetPnL(t);
   });
   const sorted = Object.keys(monthly).sort();
   const data = {};
@@ -1913,8 +2115,7 @@ function drawMonthlyBar() {
   drawBarChart('bar-monthly', data);
 }
 
-// Equity curve on canvas
-function drawEquityCurve(closed) {
+function drawEquityCurve(pnlArray) {
   const canvas = document.getElementById('equity-canvas');
   const ctx = canvas.getContext('2d');
   canvas.width = canvas.offsetWidth * window.devicePixelRatio;
@@ -1923,7 +2124,7 @@ function drawEquityCurve(closed) {
   const W = canvas.offsetWidth, H = canvas.offsetHeight;
   ctx.clearRect(0, 0, W, H);
 
-  if (closed.length < 2) {
+  if (!pnlArray || pnlArray.length < 2) {
     ctx.fillStyle = 'rgba(132,148,168,0.3)';
     ctx.font = '12px Sora';
     ctx.textAlign = 'center';
@@ -1932,7 +2133,7 @@ function drawEquityCurve(closed) {
   }
 
   const cumulPnL = [0];
-  closed.slice().reverse().forEach(t => cumulPnL.push(cumulPnL[cumulPnL.length-1] + calcPnL(t)));
+  pnlArray.slice().reverse().forEach(p => cumulPnL.push(cumulPnL[cumulPnL.length-1] + p));
   const min = Math.min(...cumulPnL), max = Math.max(...cumulPnL);
   const range = max - min || 1;
   const pad = 20;
@@ -2030,9 +2231,9 @@ function drawDonut(wins, losses, be) {
 function drawCalendar() {
   const el = document.getElementById('cal-months');
   const dailyPnL = {};
-  trades.filter(t => calcPnL(t) !== null).forEach(t => {
+  trades.filter(t => calcNetPnL(t) !== null).forEach(t => {
     if (!dailyPnL[t.date]) dailyPnL[t.date] = 0;
-    dailyPnL[t.date] += calcPnL(t);
+    dailyPnL[t.date] += calcNetPnL(t);
   });
 
   const months = [...new Set(trades.map(t => t.date?.substring(0,7)))].filter(Boolean).sort().reverse().slice(0, 3);
@@ -2063,54 +2264,55 @@ function drawCalendar() {
 // QUICK INSIGHTS
 // ─────────────────────────────────────────
 function renderInsights() {
-  const closed = trades.filter(t => calcPnL(t) !== null);
+  const closed = trades.filter(t => calcNetPnL(t) !== null);
   if (!closed.length) {
     document.getElementById('quick-insights').innerHTML = `<div class="insight-card"><div class="insight-title">No data yet</div><div class="insight-body">Start logging trades to get AI-powered insights.</div></div>`;
     return;
   }
-  const pnls = closed.map(t => calcPnL(t));
-  const wins = pnls.filter(p => p > 0);
-  const losses = pnls.filter(p => p < 0);
-  const wr = (wins.length / closed.length * 100).toFixed(1);
-  const avgWin = wins.length ? wins.reduce((a,b)=>a+b,0)/wins.length : 0;
+  const netPnLs = closed.map(t => calcNetPnL(t));
+  const wins    = netPnLs.filter(p => p > 0);
+  const losses  = netPnLs.filter(p => p < 0);
+  const wr      = (wins.length / closed.length * 100).toFixed(1);
+  const avgWin  = wins.length   ? wins.reduce((a,b)=>a+b,0)/wins.length : 0;
   const avgLoss = losses.length ? Math.abs(losses.reduce((a,b)=>a+b,0)/losses.length) : 0;
-  const rr = avgLoss ? avgWin/avgLoss : 0;
+  const rr      = avgLoss ? avgWin/avgLoss : 0;
+  const totalCharges = closed.reduce((a,t) => {
+    const en = parseFloat(t.entry), ex = parseFloat(t.exit), lo = parseFloat(t.lots)||1;
+    if (!isNaN(en)&&!isNaN(ex)) return a + calcZerodhaCharges(t.instrument,t.optType,t.direction,en,ex,lo).total;
+    return a;
+  }, 0);
 
-  // Best setup
   const setupPnL = {};
   closed.forEach(t => {
-    const s = t.setup || 'Unknown';
+    const s = t.setup||'Unknown';
     if (!setupPnL[s]) setupPnL[s] = [];
-    setupPnL[s].push(calcPnL(t));
+    setupPnL[s].push(calcNetPnL(t));
   });
-  const bestSetup = Object.entries(setupPnL).sort((a,b) => b[1].reduce((x,y)=>x+y,0) - a[1].reduce((x,y)=>x+y,0))[0];
-  const worstSetup = Object.entries(setupPnL).sort((a,b) => a[1].reduce((x,y)=>x+y,0) - b[1].reduce((x,y)=>x+y,0))[0];
-
-  // Emotion check
+  const bestSetup  = Object.entries(setupPnL).sort((a,b)=>b[1].reduce((x,y)=>x+y,0)-a[1].reduce((x,y)=>x+y,0))[0];
+  const worstSetup = Object.entries(setupPnL).sort((a,b)=>a[1].reduce((x,y)=>x+y,0)-b[1].reduce((x,y)=>x+y,0))[0];
   const emotionPnL = {};
   closed.forEach(t => {
-    const e = t.emotion || 'Unknown';
+    const e = t.emotion||'Unknown';
     if (!emotionPnL[e]) emotionPnL[e] = 0;
-    emotionPnL[e] += calcPnL(t);
+    emotionPnL[e] += calcNetPnL(t);
   });
-  const badEmotions = Object.entries(emotionPnL).filter(([e,p]) => p < 0 && ['FOMO','Revenge','Anxious'].some(b => e.includes(b)));
-
-  // Mistake freq
-  const mistakes = closed.filter(t => t.mistake && t.mistake !== 'None').map(t => t.mistake);
+  const badEmotions = Object.entries(emotionPnL).filter(([e,p])=>p<0&&['FOMO','Revenge','Anxious'].some(b=>e.includes(b)));
+  const mistakes = closed.filter(t=>t.mistake&&t.mistake!=='None').map(t=>t.mistake);
   const mistakeCount = {};
-  mistakes.forEach(m => mistakeCount[m] = (mistakeCount[m]||0)+1);
+  mistakes.forEach(m=>mistakeCount[m]=(mistakeCount[m]||0)+1);
   const topMistake = Object.entries(mistakeCount).sort((a,b)=>b[1]-a[1])[0];
 
   const insights = [
-    { type: rr>=1.5?'good':'warn', val: rr.toFixed(2) + 'x', title: 'Risk:Reward Ratio', body: rr >= 1.5 ? `Excellent! Your average win is ${rr.toFixed(1)}x your average loss. Keep this up.` : `Your R:R of ${rr.toFixed(2)} is below the ideal 1.5x. Consider tightening losses or letting winners run.` },
-    { type: parseFloat(wr)>=55?'good':'warn', val: wr + '%', title: 'Win Rate', body: parseFloat(wr) >= 55 ? 'Strong win rate! Make sure you are not sacrificing R:R to maintain this.' : 'Win rate below 55%. You need a strong R:R ratio to remain profitable.' },
-    bestSetup ? { type: 'good', val: '₹' + bestSetup[1].reduce((a,b)=>a+b,0).toFixed(0), title: `Best Setup: ${bestSetup[0]}`, body: `${bestSetup[0]} is your most profitable setup. Consider focusing more trades here.` } : null,
-    worstSetup && worstSetup[1].reduce((a,b)=>a+b,0) < 0 ? { type: 'bad', val: '₹' + worstSetup[1].reduce((a,b)=>a+b,0).toFixed(0), title: `Worst Setup: ${worstSetup[0]}`, body: `${worstSetup[0]} is consistently losing. Review or avoid this setup.` } : null,
-    badEmotions.length ? { type: 'bad', val: 'Emotion Risk', title: 'Emotional Trading Detected', body: `Trades with negative emotions (FOMO, Revenge, Anxiety) are costing you money. Strict rules help.` } : null,
-    topMistake ? { type: 'warn', val: `${topMistake[1]}x`, title: `Recurring Mistake: ${topMistake[0]}`, body: `You have made "${topMistake[0]}" ${topMistake[1]} times. Create a rule to specifically prevent this.` } : null,
+    { type: rr>=1.5?'good':'warn', val: rr.toFixed(2)+'x', title: 'Risk:Reward Ratio (Net)', body: rr>=1.5?`Excellent! Net R:R of ${rr.toFixed(1)}x after all charges.`:`Net R:R of ${rr.toFixed(2)} is below ideal 1.5x. Charges eat into small wins.` },
+    { type: parseFloat(wr)>=55?'good':'warn', val: wr+'%', title: 'Win Rate (Net)', body: parseFloat(wr)>=55?'Strong win rate after charges!':'Win rate below 55% after charges. Focus on quality setups.' },
+    { type: 'warn', val: '₹'+totalCharges.toFixed(0), title: 'Total Charges Paid', body: `You have paid ₹${totalCharges.toFixed(0)} in brokerage, STT, GST and other charges. Fewer, higher-quality trades reduce this cost.` },
+    bestSetup?{ type:'good', val:'₹'+bestSetup[1].reduce((a,b)=>a+b,0).toFixed(0), title:`Best Setup: ${bestSetup[0]}`, body:`${bestSetup[0]} is your most profitable setup (net of charges). Trade this more.` }:null,
+    worstSetup&&worstSetup[1].reduce((a,b)=>a+b,0)<0?{ type:'bad', val:'₹'+worstSetup[1].reduce((a,b)=>a+b,0).toFixed(0), title:`Worst Setup: ${worstSetup[0]}`, body:`${worstSetup[0]} is consistently losing after charges. Avoid or review this setup.` }:null,
+    badEmotions.length?{ type:'bad', val:'Emotion Risk', title:'Emotional Trading Detected', body:`Trades under negative emotions (FOMO/Revenge/Anxiety) are losing after charges. Strict rules help.` }:null,
+    topMistake?{ type:'warn', val:`${topMistake[1]}x`, title:`Recurring Mistake: ${topMistake[0]}`, body:`"${topMistake[0]}" repeated ${topMistake[1]} times. Each repeat costs you charges even if you exit flat.` }:null,
   ].filter(Boolean);
 
-  document.getElementById('quick-insights').innerHTML = insights.map(i => `
+  document.getElementById('quick-insights').innerHTML = insights.map(i=>`
     <div class="insight-card ${i.type==='good'?'':i.type}">
       <div class="insight-val ${i.type==='good'?'':i.type}">${i.val}</div>
       <div class="insight-title">${i.title}</div>
@@ -2220,10 +2422,10 @@ Provide a direct, actionable response. Use specific numbers from the data. Be li
 // HEADER P&L
 // ─────────────────────────────────────────
 function updateHeaderPnL() {
-  const closed = trades.filter(t => calcPnL(t) !== null);
-  const total = closed.reduce((a,t)=>a+calcPnL(t),0);
+  const closed = trades.filter(t => calcNetPnL(t) !== null);
+  const total  = closed.reduce((a,t) => a + (calcNetPnL(t)||0), 0);
   const el = document.getElementById('live-pnl');
-  el.textContent = `P&L: ${total >= 0 ? '+' : ''}₹${Math.abs(total).toLocaleString('en-IN')}`;
+  el.textContent = `Net P&L: ${total >= 0 ? '+' : ''}₹${Math.abs(total).toLocaleString('en-IN',{maximumFractionDigits:0})}`;
   el.style.color = total > 0 ? 'var(--green)' : total < 0 ? 'var(--red)' : 'var(--warn)';
 }
 
